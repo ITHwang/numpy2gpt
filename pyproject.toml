@@ -5,7 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "loguru>=0.7.3",
     "mypy>=1.15.0",
+    "numpy>=2.2.3",
     "pre-commit>=4.1.0",
     "pytest>=8.3.4",
     "ruff>=0.9.9",
