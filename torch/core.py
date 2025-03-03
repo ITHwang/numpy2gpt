@@ -97,50 +97,123 @@ class Tensor:
 
         while funcs:
             f = funcs.pop()
-            x, y = f.input, f.output
-            x.grad = f.backward(y.grad)
-            if x.creator is not None:
-                funcs.append(x.creator)
+
+            # get gradients of outputs
+            gys = [output.grad for output in f.outputs]
+            gxs = f.backward(*gys)
+            if not isinstance(gxs, tuple):
+                gxs = (gxs,)
+
+            # set gradients of inputs
+            # If the input has a creator, it means that the input is an output of another function.
+            # So, we need to add the creator to the list of functions to get another gradient.
+            for x, gx in zip(f.inputs, gxs):
+                # if the grad is set in the loop, accumulate it.
+                if x.grad is None:
+                    x.grad = gx
+                else:
+                    # DO NOT use +=, it is in-place operation(numpy) causing side effects.
+                    x.grad = x.grad + gx
+
+                if x.creator is not None:
+                    funcs.append(x.creator)
+
+    def cleargrad(self) -> None:
+        self.grad = None
 
 
 class Function:
-    def __call__(self, input: Tensor) -> Tensor:
-        x = input.data
-        # Warning: Sometimes the output of the forward method is a scalar,
-        # when the input is a zero-dimensional array.
-        y = self.forward(x)
-        output = Tensor(y)
-        output.creator = self
+    def __call__(self, *inputs: Tensor) -> Tensor | tuple[Tensor, ...]:
+        """Do forward propagation.
 
-        self.input: Tensor = input
-        self.output: Tensor = output
+        Warning: Sometimes the output of the forward method is a scalar,
+            when the input is a zero-dimensional array.
 
-        return output
+        Args:
+            inputs: list[Tensor]
 
-    def forward(self, x: np.ndarray) -> np.ndarray:
+        Returns:
+            Tensor | list[Tensor]
+        """
+        xs = tuple(input.data for input in inputs)
+        ys = self.forward(*xs)
+        if not isinstance(ys, tuple):
+            ys = (ys,)
+
+        outputs = tuple(Tensor(y) for y in ys)
+        for output in outputs:
+            output.creator = self
+
+        self.inputs: tuple[Tensor, ...] = inputs
+        self.outputs: tuple[Tensor, ...] = outputs
+
+        return outputs if len(outputs) > 1 else outputs[0]
+
+    def forward(self, *xs: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
         raise NotImplementedError
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
+    def backward(self, *gys: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
         raise NotImplementedError
+
+
+class Add(Function):
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 2:
+            raise ValueError("Add must take two arguments")
+
+        x0, x1 = xs
+        y = x0 + x1
+
+        return y
+
+    def backward(self, *gys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        if len(gys) != 1:
+            raise ValueError("Add must take one argument")
+
+        gy = gys[0]
+
+        return gy, gy
 
 
 class Square(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return x**2
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 1:
+            raise ValueError("Square must take one argument")
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x = self.input.data
+        x = xs[0]
+        y = x**2
+
+        return y
+
+    def backward(self, *gys: np.ndarray) -> np.ndarray:
+        if len(gys) != 1:
+            raise ValueError("Square must take one argument")
+
+        gy = gys[0]
+        x = self.inputs[0].data
         gx = 2 * x * gy
+
         return gx
 
 
 class Exp(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return np.exp(x)
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 1:
+            raise ValueError("Exp must take one argument")
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x = self.input.data
+        x = xs[0]
+        y = np.exp(x)
+
+        return y
+
+    def backward(self, *gys: np.ndarray) -> np.ndarray:
+        if len(gys) != 1:
+            raise ValueError("Exp must take one argument")
+
+        gy = gys[0]
+        x = self.inputs[0].data
         gx = np.exp(x) * gy
+
         return gx
 
 
@@ -152,12 +225,14 @@ def exp(x: np.ndarray) -> np.ndarray:
     return Exp()(x)
 
 
+def add(x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    return Add()(x0, x1)
+
+
 if __name__ == "__main__":
-    x = Tensor(np.array(0.5))
-    y = square(exp(square(x)))
+    x0 = Tensor(np.array(2.0))
 
+    y = add(add(x0, x0), x0)
     y.backward()
-    print(x.grad)
-
-    b = Tensor(2.0)
-    print(b.data)
+    print(y.data)
+    print(x0.grad)
