@@ -28,5 +28,7 @@ jobs:
           python-version: "3.12"
       - name: Install pip
         run: uv pip install pip
+      - name: Install pytest
+        run: uv pip install pytest
       - name: pre-commit
         uses: pre-commit/action@v3.0.1
