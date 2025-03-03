@@ -1,7 +1,9 @@
-<figure align="center">
-    <img src='./asset/img/numpy2gpt-logo.png' alt='logo' width="50%" height="50%" />
-    <figcaption>Source: <a href="https://openai.com">ChatGPT</a></figcaption>
-</figure>
+<p align="center">
+  <figure>
+      <img src='./asset/img/numpy2gpt-logo.png' alt='logo' width="50%" height="50%" />
+      <figcaption>Source: <a href="https://openai.com">ChatGPT</a></figcaption>
+  </figure>
+</p>
 
 <p align="center">
   <em>This is an educational implementation of GPT from scratch using numpy.</em>
