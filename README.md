@@ -1,8 +1,5 @@
 <p align="center">
-  <figure>
-      <img src='./asset/img/numpy2gpt-logo.png' alt='logo' width="50%" height="50%" />
-      <figcaption>Source: <a href="https://openai.com">ChatGPT</a></figcaption>
-  </figure>
+  <img src='./asset/img/numpy2gpt-logo.png' alt='logo' width="30%" height="30%" style="display: block; margin-left: auto; margin-right: auto;"/>
 </p>
 
 <p align="center">
@@ -16,16 +13,13 @@
 </p>
 
 # Diagrams
----
 - TBD
 
 # TO-DOs
----
 - [ ] Implement basic tensor operations
   - See: [Tensor Playground](https://www.kaggle.com/code/reichenbch/tensor-playground)
 
 # References
----
 - [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3)
 - [nanoGPT](https://github.com/karpathy/nanoGPT)
 - [pytorch](https://github.com/pytorch/pytorch)
