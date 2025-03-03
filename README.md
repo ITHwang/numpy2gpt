@@ -10,7 +10,7 @@
 <p align="center">
   <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg">
   <img alt="PyPI - Supported Python versions" src="https://img.shields.io/badge/python-3.12-blue">
-  <img alt="build" src="https://github.com/github/docs/actions/workflows/main.yml/badge.svg">
+  <img alt="build" src="https://github.com/ITHwang/numpy2gpt/actions/workflows/main.yml/badge.svg">
 </p>
 
 # Diagrams
