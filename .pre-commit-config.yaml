@@ -3,8 +3,6 @@ repos:
     rev: v0.9.9
     hooks:
       - id: ruff
-        args: [--fix]
-      - id: ruff
         args: ["check", "--select", "I", "--fix"]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
