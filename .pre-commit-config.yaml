@@ -13,3 +13,10 @@ repos:
       - id: mypy
         args: [--strict, --ignore-missing-imports]
         additional_dependencies: [tokenize-rt==3.2.0]
+  - repo: local
+    hooks:
+    - id: pytest
+      name: pytest
+      entry: ./.venv/bin/pytest
+      language: system
+      types: [python]

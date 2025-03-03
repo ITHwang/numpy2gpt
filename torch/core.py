@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 import numpy as np
 
@@ -13,6 +13,16 @@ T: TypeAlias = (
     | np.float32
     | np.float64
     | np.ndarray
+)
+T_TUPLE = (
+    int,
+    float,
+    list,
+    np.int32,
+    np.int64,
+    np.float32,
+    np.float64,
+    np.ndarray,
 )
 
 
@@ -50,7 +60,7 @@ class Tensor:
         if data is not None:
             if isinstance(data, np.ndarray):
                 pass
-            elif isinstance(data, T):
+            elif isinstance(data, T_TUPLE):
                 data = np.array(data)
             else:
                 raise ValueError(f"Data has an invalid type: {type(data)}")
