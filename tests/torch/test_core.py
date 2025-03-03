@@ -9,6 +9,16 @@ from torch import core
 def numerical_diff(
     f: Callable[[core.Tensor], core.Tensor], x: core.Tensor, eps: float = 1e-4
 ) -> float:
+    """Calculate the numerical gradient of a function.
+
+    The central difference is more accurate than the forward difference.
+    See: http://www.ohiouniversityfaculty.com/youngt/IntNumMeth/lecture27.pdf
+
+    Args:
+        f: A function that takes a Tensor and returns a Tensor.
+        x: The input Tensor.
+        eps: The epsilon value for numerical differentiation.
+    """
     x0 = core.tensor(x.data - eps)
     x1 = core.tensor(x.data + eps)
     y0 = f(x0)

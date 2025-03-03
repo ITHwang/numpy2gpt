@@ -1,4 +1,16 @@
-This is an educational implementation of GPT from scratch.
+<figure>
+    <img src='./asset/img/numpy2gpt-logo.png' alt='logo' />
+    <figcaption>Source: <a href="https://openai.com">ChatGPT</a></figcaption>
+</figure>
+
+<p align="center">
+  <em>This is an educational implementation of GPT from scratch using numpy.</em>
+</p>
+
+<p align="center">
+  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg">
+  <img alt="PyPI - Supported Python versions" src="https://img.shields.io/badge/python-3.12-blue">
+</p>
 
 # Diagrams
 ---
