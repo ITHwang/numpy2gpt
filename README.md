@@ -1,5 +1,5 @@
 <figure>
-    <img src='./asset/img/numpy2gpt-logo.png' alt='logo' />
+    <img src='./asset/img/numpy2gpt-logo.png' alt='logo' width="50%" height="50%" />
     <figcaption>Source: <a href="https://openai.com">ChatGPT</a></figcaption>
 </figure>
 
@@ -19,7 +19,7 @@
 
 # TO-DOs
 ---
-- [] Implement basic tensor operations
+- [ ] Implement basic tensor operations
   - See: [Tensor Playground](https://www.kaggle.com/code/reichenbch/tensor-playground)
 
 # References
