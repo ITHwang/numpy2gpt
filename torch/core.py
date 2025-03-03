@@ -1,29 +1,29 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy as np
 
+T: TypeAlias = (
+    int
+    | float
+    | list[int | float]
+    | np.int32
+    | np.int64
+    | np.float32
+    | np.float64
+    | np.ndarray
+)
 
-def as_array(x: Any) -> np.ndarray:
-    """Convert a scalar or a list to a numpy.ndarray
 
-    If x is a scalar, convert it to a numpy.ndarray with shape (1,).
-    See: https://github.com/numpy/numpy/blob/v2.1.0/numpy/_core/numeric.py#L1937-L2021
-    """
-    if np.isscalar(x):
-        return np.array(x)
-    return x
-
-
-def tensor(data: np.ndarray | Any) -> Tensor:
+def tensor(data: T | None = None) -> Tensor:
     """An imitation of torch.tensor in PyTorch
 
     Originally, torch.tensor is written in C++.
     Python binding code:
         https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/python_torch_functions_manual.cpp#L243-L267
     """
-    return Tensor(as_array(data))
+    return Tensor(data)
 
 
 class Tensor:
@@ -36,10 +36,10 @@ class Tensor:
     See: https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/variable.h
     """
 
-    def __init__(self, data: np.ndarray) -> None:
+    def __init__(self, data: T | None = None) -> None:
         """
         Args:
-            data: numpy.ndarray
+            data: numpy.ndarray | int | float | None
             grad: numpy.ndarray | None
             creator: when forwarding, memorize the function that created this tensor
                 for backward propagation.
@@ -48,8 +48,12 @@ class Tensor:
                 of the gradient function(`grad_fn` or `grad_accumulator`).
         """
         if data is not None:
-            if not isinstance(data, np.ndarray):
-                raise ValueError(f"Data must be a numpy.ndarray. But got {type(data)}")
+            if isinstance(data, np.ndarray):
+                pass
+            elif isinstance(data, T):
+                data = np.array(data)
+            else:
+                raise ValueError(f"Data has an invalid type: {type(data)}")
 
         self.data = data
         self.grad: np.ndarray | None = None
@@ -92,10 +96,10 @@ class Tensor:
 class Function:
     def __call__(self, input: Tensor) -> Tensor:
         x = input.data
-        y = self.forward(x)
-        # Sometimes the output of the forward method is a scalar,
+        # Warning: Sometimes the output of the forward method is a scalar,
         # when the input is a zero-dimensional array.
-        output = Tensor(as_array(y))
+        y = self.forward(x)
+        output = Tensor(y)
         output.creator = self
 
         self.input: Tensor = input
@@ -145,6 +149,5 @@ if __name__ == "__main__":
     y.backward()
     print(x.grad)
 
-    # TODO: it shoud be possible
-    # https://www.kaggle.com/code/reichenbch/tensor-playground
     b = Tensor(2.0)
+    print(b.data)
