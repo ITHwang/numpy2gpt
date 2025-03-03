@@ -1,4 +1,4 @@
-<figure>
+<figure align="center">
     <img src='./asset/img/numpy2gpt-logo.png' alt='logo' width="50%" height="50%" />
     <figcaption>Source: <a href="https://openai.com">ChatGPT</a></figcaption>
 </figure>
