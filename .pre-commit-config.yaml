@@ -17,6 +17,6 @@ repos:
     hooks:
     - id: pytest
       name: pytest
-      entry: ./.venv/bin/pytest
+      entry: python -m pytest
       language: system
       types: [python]
