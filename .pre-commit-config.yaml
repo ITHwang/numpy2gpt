@@ -3,8 +3,6 @@ repos:
     rev: v0.9.9
     hooks:
       - id: ruff
-        args: [--fix]
-      - id: ruff
         args: ["check", "--select", "I", "--fix"]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -13,3 +11,10 @@ repos:
       - id: mypy
         args: [--strict, --ignore-missing-imports]
         additional_dependencies: [tokenize-rt==3.2.0]
+  - repo: local
+    hooks:
+    - id: pytest
+      name: pytest
+      entry: python -m pytest
+      language: system
+      types: [python]

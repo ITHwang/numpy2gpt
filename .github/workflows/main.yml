@@ -26,7 +26,13 @@ jobs:
         uses: astral-sh/setup-uv@v5.3.1
         with:
           python-version: "3.12"
+          enable-cache: true
       - name: Install pip
         run: uv pip install pip
       - name: pre-commit
-        uses: pre-commit/action@v3.0.1
+        run: |
+          uv run pre-commit run ruff
+          uv run pre-commit run ruff-format
+          uv run pre-commit run mypy
+      - name: pytest
+        run: python -m pytest
