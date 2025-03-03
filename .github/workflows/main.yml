@@ -31,8 +31,8 @@ jobs:
         run: uv pip install pip
       - name: pre-commit
         run: |
-          pre-commit run ruff
-          pre-commit run ruff-format
-          pre-commit run mypy
+          uv run pre-commit run ruff
+          uv run pre-commit run ruff-format
+          uv run pre-commit run mypy
       - name: pytest
         run: python -m pytest
