@@ -1,4 +1,4 @@
-from typing import Callable, TypeAlias
+from typing import Callable
 
 import numpy as np
 import pytest
@@ -84,3 +84,34 @@ def test_exp_backward() -> None:
 
     # Check if they're close
     assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_multi_branch_backward() -> None:
+    """Test the backward propagation of a function with multiple branches.
+
+    (x) -> [square] -> (a) -> [square] -> (b) -> [add] -> (y)
+                        |                          ^
+                        |                          |
+                        ----> [square] -> (c) ------
+    """
+    x = core.tensor(np.array(1.0))
+    a = core.square(x)
+    b = core.square(a)
+    c = core.square(a)
+    y = core.add(b, c)
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    grad_b, grad_c = np.array(1), np.array(1)
+
+    grad_a = (
+        numerical_diff(core.square, a) * grad_b
+        + numerical_diff(core.square, a) * grad_c
+    )
+
+    grad_x = numerical_diff(core.square, core.tensor(grad_a))
+
+    assert np.allclose(analytical_grad, grad_x)
