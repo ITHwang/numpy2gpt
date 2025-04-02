@@ -29,10 +29,8 @@ jobs:
           enable-cache: true
       - name: Install pip
         run: uv pip install pip
+      - name: Install pytest
+        run: uv pip install pytest
       - name: pre-commit
-        run: |
-          uv run pre-commit run ruff
-          uv run pre-commit run ruff-format
-          uv run pre-commit run mypy
-      - name: pytest
-        run: python -m pytest
+        uses: pre-commit/action@v3.0.1
+    
