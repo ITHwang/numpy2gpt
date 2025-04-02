@@ -27,12 +27,8 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - name: Install pip
-        run: uv pip install pip
+      - name: Install dependencies
+        run: uv sync
       - name: pre-commit
-        run: |
-          uv run pre-commit run ruff
-          uv run pre-commit run ruff-format
-          uv run pre-commit run mypy
-      - name: pytest
-        run: python -m pytest
+        run: pre-commit
+    

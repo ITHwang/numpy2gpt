@@ -4,6 +4,8 @@ from typing import TypeAlias
 
 import numpy as np
 
+from torch.priority_queue import PriorityQueue
+
 T: TypeAlias = (
     int
     | float
@@ -48,14 +50,26 @@ class Tensor:
 
     def __init__(self, data: T | None = None) -> None:
         """
+        self.grad: numpy.ndarray | None
+        self.creator: when forwarding, memorize the function that created this tensor
+            for backward propagation.
+            Similarly, in PyTorch `Variable`s have the notion of a `gradient_edge`, which is the
+            edge in the autograd graph that connects the variable to a particular input
+            of the gradient function(`grad_fn` or `grad_accumulator`).
+        self.generation: the generation of the tensor.
+            A function gets inputs and outputs.
+            e.g., [input] -> [function] -> [output]
+
+            The generation of the input will be the generation of the function.
+            The generation of the output is the generation of the function plus 1.
+            e.g., [input][gen=2] -> [function][gen=2] -> [output][gen=3]
+
+            Generation is for determining the order of backward propagation.
+            The backward propagation that has inputs with higher generation will be called first.
+            If the generations of inputs are different, the higher generation will be the one of the function.
+
         Args:
             data: numpy.ndarray | int | float | None
-            grad: numpy.ndarray | None
-            creator: when forwarding, memorize the function that created this tensor
-                for backward propagation.
-                Similarly, in PyTorch `Variable`s have the notion of a `gradient_edge`, which is the
-                edge in the autograd graph that connects the variable to a particular input
-                of the gradient function(`grad_fn` or `grad_accumulator`).
         """
         if data is not None:
             if isinstance(data, np.ndarray):
@@ -68,6 +82,7 @@ class Tensor:
         self.data = data
         self.grad: np.ndarray | None = None
         self.creator: Function | None = None
+        self.generation: int = 0
 
     @property
     def creator(self) -> Function | None:
@@ -91,56 +106,163 @@ class Tensor:
         if self.grad is None:
             self.grad = np.ones_like(self.data)
 
-        funcs = []
-        if self.creator is not None:
-            funcs.append(self.creator)
+        funcs: PriorityQueue[Function] = PriorityQueue()
+        seen_set: set[Function] = set()
+
+        def add_func(f: Function) -> None:
+            """Push a func to the priority queue.
+
+            If the func is already in the seen set, it will not be pushed,
+            which prevent the same func from doing backward propagation multiple times.
+
+            Args:
+                f (Function): the function to push
+            """
+            if f not in seen_set:
+                funcs.push(f, f.generation)
+                seen_set.add(f)
+
+        # push the creator which creates the final output
+        if self.creator is None:
+            raise ValueError("The final output should have a creator")
+        add_func(self.creator)
 
         while funcs:
             f = funcs.pop()
-            x, y = f.input, f.output
-            x.grad = f.backward(y.grad)
-            if x.creator is not None:
-                funcs.append(x.creator)
+
+            # get gradients of outputs
+            gys = [output.grad for output in f.outputs]
+            gxs = f.backward(*gys)
+            if not isinstance(gxs, tuple):
+                gxs = (gxs,)
+
+            # set gradients of inputs
+            for x, gx in zip(f.inputs, gxs):
+                # if the grad is set in the loop, accumulate it.
+                if x.grad is None:
+                    x.grad = gx
+                else:
+                    # DO NOT use +=, it is in-place operation(numpy) causing side effects.
+                    x.grad = x.grad + gx
+
+                # If the input has a creator, it means that the input is an output of another function.
+                # So, we need to add the creator to the list of functions to get another gradient.
+                if x.creator is not None:
+                    add_func(x.creator)
+
+    def cleargrad(self) -> None:
+        self.grad = None
 
 
 class Function:
-    def __call__(self, input: Tensor) -> Tensor:
-        x = input.data
-        # Warning: Sometimes the output of the forward method is a scalar,
-        # when the input is a zero-dimensional array.
-        y = self.forward(x)
-        output = Tensor(y)
-        output.creator = self
+    def __call__(self, *inputs: Tensor) -> Tensor | tuple[Tensor, ...]:
+        """Do forward propagation.
+        self.generation: the generation of the function.
+            A function gets inputs and outputs.
+            e.g., [input] -> [function] -> [output]
 
-        self.input: Tensor = input
-        self.output: Tensor = output
+            The generation of the input will be the generation of the function.
+            The generation of the output is the generation of the function plus 1.
+            e.g., [input][gen=2] -> [function][gen=2] -> [output][gen=3]
 
-        return output
+            Generation is for determining the order of backward propagation.
+            The backward propagation that has inputs with higher generation will be called first.
+            If the generations of inputs are different, the higher generation will be the one of the function.
 
-    def forward(self, x: np.ndarray) -> np.ndarray:
+        Warning: Sometimes the output of the forward method is a scalar,
+            when the input is a zero-dimensional array.
+
+        Args:
+            inputs: list[Tensor]
+
+        Returns:
+            Tensor | list[Tensor]
+        """
+        # forward propagation
+        xs = tuple(input.data for input in inputs)
+        ys = self.forward(*xs)
+        if not isinstance(ys, tuple):
+            ys = (ys,)
+        outputs = tuple(Tensor(y) for y in ys)
+
+        # set the creator of the output
+        for output in outputs:
+            output.creator = self
+
+        # If the generations of inputs are different, the higher generation will be the one of the function.
+        self.generation = max([input.generation for input in inputs])
+
+        # set the inputs and outputs
+        self.inputs: tuple[Tensor, ...] = inputs
+        self.outputs: tuple[Tensor, ...] = outputs
+
+        return outputs if len(outputs) > 1 else outputs[0]
+
+    def forward(self, *xs: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
         raise NotImplementedError
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
+    def backward(self, *gys: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
         raise NotImplementedError
+
+
+class Add(Function):
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 2:
+            raise ValueError("Add must take two arguments")
+
+        x0, x1 = xs
+        y = x0 + x1
+
+        return y
+
+    def backward(self, *gys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        if len(gys) != 1:
+            raise ValueError("Add must take one argument")
+
+        gy = gys[0]
+
+        return gy, gy
 
 
 class Square(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return x**2
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 1:
+            raise ValueError("Square must take one argument")
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x = self.input.data
+        x = xs[0]
+        y = x**2
+
+        return y
+
+    def backward(self, *gys: np.ndarray) -> np.ndarray:
+        if len(gys) != 1:
+            raise ValueError("Square must take one argument")
+
+        gy = gys[0]
+        x = self.inputs[0].data
         gx = 2 * x * gy
+
         return gx
 
 
 class Exp(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return np.exp(x)
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 1:
+            raise ValueError("Exp must take one argument")
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x = self.input.data
+        x = xs[0]
+        y = np.exp(x)
+
+        return y
+
+    def backward(self, *gys: np.ndarray) -> np.ndarray:
+        if len(gys) != 1:
+            raise ValueError("Exp must take one argument")
+
+        gy = gys[0]
+        x = self.inputs[0].data
         gx = np.exp(x) * gy
+
         return gx
 
 
@@ -152,12 +274,15 @@ def exp(x: np.ndarray) -> np.ndarray:
     return Exp()(x)
 
 
+def add(x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    return Add()(x0, x1)
+
+
 if __name__ == "__main__":
-    x = Tensor(np.array(0.5))
-    y = square(exp(square(x)))
-
+    x = Tensor(np.array(2.0))
+    a = square(x)
+    y = add(square(a), square(a))
     y.backward()
-    print(x.grad)
 
-    b = Tensor(2.0)
-    print(b.data)
+    print(y.data)
+    print(x.grad)
