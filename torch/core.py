@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from typing import TypeAlias
 
 import numpy as np
@@ -92,7 +93,7 @@ class Tensor:
     def creator(self, func: Function) -> None:
         self._creator = func
 
-    def backward(self) -> None:
+    def backward(self, retain_grad: bool = False) -> None:
         """Backward propagation.
 
         Traverses the computational graph backwards:
@@ -100,6 +101,12 @@ class Tensor:
         - Computes gradients by calling each function's backward method
         - Propagates gradients to input tensors
         - Continues recursively through the entire graph
+
+        Args:
+            retain_grad: Whether to keep the gradients of the output tensors
+                In most cases, we don't need to keep the gradients in the middle of the backpropagation.
+                We finally use only the gradient of the "first" input tensor.(dy/dx)
+                So, we set it to False by default.
         """
         # if the gradient is not set, set it to 1.0
         # this is because dy/dy = 1.0
@@ -131,7 +138,8 @@ class Tensor:
             f = funcs.pop()
 
             # get gradients of outputs
-            gys = [output.grad for output in f.outputs]
+            # NOTE: f.outputs is a tuple of weakref.ref[Tensor]
+            gys = [output().grad for output in f.outputs]  # type: ignore
             gxs = f.backward(*gys)
             if not isinstance(gxs, tuple):
                 gxs = (gxs,)
@@ -149,6 +157,11 @@ class Tensor:
                 # So, we need to add the creator to the list of functions to get another gradient.
                 if x.creator is not None:
                     add_func(x.creator)
+
+            if not retain_grad:
+                for output in f.outputs:
+                    # NOTE: output is a weakref.ref[Tensor]
+                    output().grad = None  # type: ignore
 
     def cleargrad(self) -> None:
         self.grad = None
@@ -193,8 +206,12 @@ class Function:
         self.generation = max([input.generation for input in inputs])
 
         # set the inputs and outputs
+        # NOTE: For memory optimization we wraps output tensors with weakref,
+        #       by removing the circular reference between the function and the output tensor.
         self.inputs: tuple[Tensor, ...] = inputs
-        self.outputs: tuple[Tensor, ...] = outputs
+        self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
+            weakref.ref(output) for output in outputs
+        )
 
         return outputs if len(outputs) > 1 else outputs[0]
 
@@ -279,10 +296,11 @@ def add(x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    x = Tensor(np.array(2.0))
-    a = square(x)
-    y = add(square(a), square(a))
+    x0 = Tensor(np.array(1.0))
+    x1 = Tensor(np.array(2.0))
+    t = add(x0, x1)
+    y = square(t)
     y.backward()
 
-    print(y.data)
-    print(x.grad)
+    print(y.grad, t.grad)
+    print(x0.grad, x1.grad)

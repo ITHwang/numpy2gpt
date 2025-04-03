@@ -15,7 +15,7 @@
 # Overview
 - An educational implementation of GPT from scratch using numpy, inspired by [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3) and [nanoGPT](https://github.com/karpathy/nanoGPT).
 
-# Core Concepts
+# Concepts
 
 ## Auto Differentiation
 1. Auto Differentiation is a core algorithm for neural networks to compute backpropagation by following the chain rule.
@@ -62,10 +62,12 @@
       c --> Func4[Func4 @ 2]
       Func4 --> y((y @ 3))
     ```
+4. `Memory Optimization`
+  - As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
+  - To avoid this, we use `weakref.ref` for the outputs of the function.
+  - Using weakref.ref for output tensors eliminates circular references, reducing memory usage by 72% (from 136.4 MiB to 38.2 MiB) in our test([measure_memory.py](./torch/measure_memory.py)).
 
-4. `Memory Optimization`: As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
-
-# Core Features
+# Features
 
 ## Tensor Operations
 - See: [Tensor Playground](https://www.kaggle.com/code/reichenbch/tensor-playground)

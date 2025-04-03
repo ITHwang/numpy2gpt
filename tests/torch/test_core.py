@@ -115,3 +115,22 @@ def test_multi_branch_backward() -> None:
     grad_x = numerical_diff(core.square, core.tensor(grad_a))
 
     assert np.allclose(analytical_grad, grad_x)
+
+
+@pytest.mark.parametrize(  # type: ignore
+    "retain_grad",
+    [True, False],
+)
+def test_retain_grad(retain_grad: bool) -> None:
+    x0 = core.tensor(np.array(1.0))
+    x1 = core.tensor(np.array(2.0))
+    t = core.add(x0, x1)
+    y = core.square(t)
+    y.backward(retain_grad=retain_grad)
+
+    if retain_grad:
+        assert t.grad is not None
+        assert y.grad is not None
+    else:
+        assert t.grad is None
+        assert y.grad is None
