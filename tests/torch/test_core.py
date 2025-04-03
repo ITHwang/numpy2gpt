@@ -134,3 +134,61 @@ def test_retain_grad(retain_grad: bool) -> None:
     else:
         assert t.grad is None
         assert y.grad is None
+
+
+def test_using_config() -> None:
+    """Test the using_config context manager."""
+    # Save original value
+    original_value = core.Config.enable_backprop
+
+    # Test changing the value
+    with core.using_config("enable_backprop", False):
+        assert core.Config.enable_backprop is False
+
+    # Test that the value is restored
+    assert core.Config.enable_backprop == original_value
+
+    # Test nested context
+    with core.using_config("enable_backprop", False):
+        assert core.Config.enable_backprop is False
+        with core.using_config("enable_backprop", True):
+            assert core.Config.enable_backprop is True
+        assert core.Config.enable_backprop is False
+
+    # Ensure original value is restored
+    assert core.Config.enable_backprop == original_value
+
+
+def test_no_grad() -> None:
+    """Test the no_grad context manager."""
+    # Save original value
+    original_value = core.Config.enable_backprop
+
+    # Test that no_grad sets enable_backprop to False
+    with core.no_grad():
+        assert core.Config.enable_backprop is False
+
+    # Test that the value is restored
+    assert core.Config.enable_backprop == original_value
+
+
+def test_forward_with_no_grad() -> None:
+    """Test forward propagation when using no_grad."""
+    x = core.tensor(np.array(2.0))
+
+    with core.no_grad():
+        y = core.square(x)
+
+    # When no_grad is used, the creator is None
+    assert y.creator is None
+
+    # Now compute with gradients enabled
+    y = core.square(x)
+    y.backward()
+
+    # Gradient should be computed
+    assert x.grad is not None
+    assert y.creator is not None
+    assert y.creator.inputs is not None
+    assert y.creator.outputs is not None
+    assert np.allclose(x.grad, 4.0)

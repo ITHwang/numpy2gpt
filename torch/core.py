@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import weakref
-from typing import TypeAlias
+from typing import ContextManager, Generator, TypeAlias
 
 import numpy as np
 
@@ -27,6 +28,37 @@ T_TUPLE = (
     np.float64,
     np.ndarray,
 )
+
+
+class Config:
+    """Config for toggling backpropagation.
+
+    When we only inference, we don't need to backpropagate gradients.
+    So, we can save memory by disabling backpropagation and removing the data used in backpropagation.
+    """
+
+    enable_backprop: bool = True
+
+
+@contextlib.contextmanager
+def using_config(name: str, value: bool) -> Generator[None, None, None]:
+    """Context manager to set a config value temporarily.
+
+    Args:
+        name: The name of the config to set
+        value: The value to set the config to
+    """
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+
+def no_grad() -> ContextManager[None]:
+    """Context manager to disable gradient calculation."""
+    return using_config("enable_backprop", False)
 
 
 def tensor(data: T | None = None) -> Tensor:
@@ -198,20 +230,22 @@ class Function:
             ys = (ys,)
         outputs = tuple(Tensor(y) for y in ys)
 
-        # set the creator of the output
-        for output in outputs:
-            output.creator = self
+        # When only inferencing, we can skip the logic below which is needed for backpropagation.
+        if Config.enable_backprop:
+            # If the generations of inputs are different, the higher generation will be the one of the function.
+            self.generation = max([input.generation for input in inputs])
 
-        # If the generations of inputs are different, the higher generation will be the one of the function.
-        self.generation = max([input.generation for input in inputs])
+            # set the creator of the output
+            for output in outputs:
+                output.creator = self
 
-        # set the inputs and outputs
-        # NOTE: For memory optimization we wraps output tensors with weakref,
-        #       by removing the circular reference between the function and the output tensor.
-        self.inputs: tuple[Tensor, ...] = inputs
-        self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
-            weakref.ref(output) for output in outputs
-        )
+            # set the inputs and outputs
+            # NOTE: For memory optimization we wraps output tensors with weakref,
+            #       by removing the circular reference between the function and the output tensor.
+            self.inputs: tuple[Tensor, ...] = inputs
+            self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
+                weakref.ref(output) for output in outputs
+            )
 
         return outputs if len(outputs) > 1 else outputs[0]
 
