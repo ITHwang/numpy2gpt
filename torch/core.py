@@ -8,7 +8,7 @@ import numpy as np
 
 from torch.priority_queue import PriorityQueue
 
-T: TypeAlias = (
+INPUT_TYPE: TypeAlias = (
     int
     | float
     | list[int | float]
@@ -18,7 +18,7 @@ T: TypeAlias = (
     | np.float64
     | np.ndarray
 )
-T_TUPLE = (
+INPUT_TYPE_TUPLE = (
     int,
     float,
     list,
@@ -28,6 +28,14 @@ T_TUPLE = (
     np.float64,
     np.ndarray,
 )
+
+
+int32: TypeAlias = np.int32
+int64: TypeAlias = np.int64
+float32: TypeAlias = np.float32
+float64: TypeAlias = np.float64
+
+TORCH_TYPE: TypeAlias = int32 | int64 | float32 | float64
 
 
 class Config:
@@ -61,7 +69,21 @@ def no_grad() -> ContextManager[None]:
     return using_config("enable_backprop", False)
 
 
-def tensor(data: T | None = None) -> Tensor:
+class Size:
+    def __init__(self, *args: int) -> None:
+        self.args = args
+
+    def __len__(self) -> int:
+        return len(self.args)
+
+    def __getitem__(self, index: int) -> int:
+        return self.args[index]
+
+    def __repr__(self) -> str:
+        return f"torch.Size([{', '.join(str(arg) for arg in self.args)}])"
+
+
+def tensor(data: INPUT_TYPE | None = None) -> Tensor:
     """An imitation of torch.tensor in PyTorch
 
     Originally, torch.tensor is written in C++.
@@ -81,7 +103,12 @@ class Tensor:
     See: https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/variable.h
     """
 
-    def __init__(self, data: T | None = None) -> None:
+    def __init__(
+        self,
+        data: INPUT_TYPE,
+        name: str | None = None,
+        dtype: TORCH_TYPE | None = None,
+    ) -> None:
         """
         self.grad: numpy.ndarray | None
         self.creator: when forwarding, memorize the function that created this tensor
@@ -103,19 +130,31 @@ class Tensor:
 
         Args:
             data: numpy.ndarray | int | float | None
+            name: You can give a name to the tensor. This is useful for debugging.
+            dtype: The dtype of the tensor. If None, the dtype will be the same as the type of the data.
         """
-        if data is not None:
-            if isinstance(data, np.ndarray):
-                pass
-            elif isinstance(data, T_TUPLE):
-                data = np.array(data)
-            else:
-                raise ValueError(f"Data has an invalid type: {type(data)}")
+        if isinstance(data, np.ndarray):
+            pass
+        elif isinstance(data, INPUT_TYPE_TUPLE):
+            data = np.array(data)
+        else:
+            raise ValueError(f"Data has an invalid type: {type(data)}")
+
+        if dtype is not None:
+            data = data.astype(dtype)
 
         self.data = data
+        self.name = name
         self.grad: np.ndarray | None = None
         self.creator: Function | None = None
         self.generation: int = 0
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __repr__(self) -> str:
+        p = str(self.data).replace("\n", "\n" + " " * 7)
+        return f"tensor({p}, dtype={self.dtype})"
 
     @property
     def creator(self) -> Function | None:
@@ -124,6 +163,21 @@ class Tensor:
     @creator.setter
     def creator(self, func: Function) -> None:
         self._creator = func
+
+    @property
+    def ndim(self) -> int:
+        return int(self.data.ndim)
+
+    @property
+    def shape(self) -> Size:
+        return self.size()
+
+    @property
+    def dtype(self) -> TORCH_TYPE:
+        return self.data.dtype
+
+    def size(self) -> Size:
+        return Size(*self.data.shape)
 
     def backward(self, retain_grad: bool = False) -> None:
         """Backward propagation.
@@ -338,3 +392,11 @@ if __name__ == "__main__":
 
     print(y.grad, t.grad)
     print(x0.grad, x1.grad)
+
+    x3 = Tensor(np.array([[[1, 2, 3], [4, 5, 6.2]], [[1, 2, 3], [4, 5, 6.2]]]))
+    print(x3.shape)
+    print(x3.ndim)
+    print(x3.size())
+    print(x3.dtype)
+    print(len(x3))
+    print(x3)

@@ -41,22 +41,20 @@ def numerical_diff(
         np.array([1.1, 2.2, 3.3]),
     ],
 )
-def test_tensor_init(input_data: core.T) -> None:
+def test_tensor_init(input_data: core.INPUT_TYPE) -> None:
+    """If the input is numeric or array, it is converted to a numpy array."""
     t = core.tensor(input_data)
     assert isinstance(t.data, np.ndarray)
 
 
-def test_tensor_init_with_none() -> None:
-    t = core.tensor()
-    assert t.data is None
-
-
 def test_tensor_init_with_invalid_type() -> None:
+    """If the input is not numeric or array, it raises an error."""
     with pytest.raises(ValueError):
         t = core.tensor("invalid")
 
 
 def test_square_backward() -> None:
+    """Test the backward propagation of the square function."""
     x = core.tensor(np.array(2.0))
     y = core.square(x)
     y.backward()
@@ -72,6 +70,7 @@ def test_square_backward() -> None:
 
 
 def test_exp_backward() -> None:
+    """Test the backward propagation of the exp function."""
     x = core.tensor(np.array(1.0))
     y = core.exp(x)
     y.backward()
@@ -122,6 +121,11 @@ def test_multi_branch_backward() -> None:
     [True, False],
 )
 def test_retain_grad(retain_grad: bool) -> None:
+    """Test the retain_grad argument of the backward method.
+
+    If retain_grad is True, the gradient of the tensor is not None.
+    If retain_grad is False, the gradient of the tensor is None.
+    """
     x0 = core.tensor(np.array(1.0))
     x1 = core.tensor(np.array(2.0))
     t = core.add(x0, x1)
@@ -137,7 +141,11 @@ def test_retain_grad(retain_grad: bool) -> None:
 
 
 def test_using_config() -> None:
-    """Test the using_config context manager."""
+    """Test the using_config context manager.
+
+    When using the using_config context manager,
+    the value of the config is temporarily changed.
+    """
     # Save original value
     original_value = core.Config.enable_backprop
 
@@ -160,7 +168,11 @@ def test_using_config() -> None:
 
 
 def test_no_grad() -> None:
-    """Test the no_grad context manager."""
+    """Test the no_grad context manager.
+
+    When using the no_grad context manager,
+    the value of the config is temporarily changed to False.
+    """
     # Save original value
     original_value = core.Config.enable_backprop
 
@@ -173,7 +185,11 @@ def test_no_grad() -> None:
 
 
 def test_forward_with_no_grad() -> None:
-    """Test forward propagation when using no_grad."""
+    """Test forward propagation when using no_grad.
+
+    When using no_grad, the creator of the tensor is None.
+    When using gradients enabled, the creator of the tensor is not None.
+    """
     x = core.tensor(np.array(2.0))
 
     with core.no_grad():
