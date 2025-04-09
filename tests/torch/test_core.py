@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Callable
 
 import numpy as np
@@ -7,7 +8,9 @@ from torch import core
 
 
 def numerical_diff(
-    f: Callable[[core.Tensor], core.Tensor], x: core.Tensor, eps: float = 1e-4
+    f: Callable[[core.INPUT_TYPE | core.Tensor], core.Tensor | tuple[core.Tensor, ...]],
+    x: core.Tensor,
+    eps: float = 1e-4,
 ) -> float:
     """Calculate the numerical gradient of a function.
 
@@ -23,7 +26,8 @@ def numerical_diff(
     x1 = core.tensor(x.data + eps)
     y0 = f(x0)
     y1 = f(x1)
-    return float((y1.data - y0.data) / (2 * eps))
+
+    return float((y1.data - y0.data) / (2 * eps))  # type: ignore
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -57,6 +61,8 @@ def test_square_backward() -> None:
     """Test the backward propagation of the square function."""
     x = core.tensor(np.array(2.0))
     y = core.square(x)
+    assert isinstance(y, core.Tensor)
+
     y.backward()
 
     # Analytical gradient
@@ -73,6 +79,8 @@ def test_exp_backward() -> None:
     """Test the backward propagation of the exp function."""
     x = core.tensor(np.array(1.0))
     y = core.exp(x)
+    assert isinstance(y, core.Tensor)
+
     y.backward()
 
     # Analytical gradient
@@ -80,6 +88,116 @@ def test_exp_backward() -> None:
 
     # Numerical gradient
     numerical_grad = numerical_diff(core.exp, x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_mul_backward() -> None:
+    """Test the backward propagation of the mul function."""
+    x0 = core.tensor(np.array(2.0))
+    x1 = core.tensor(np.array(3.0))
+
+    y = core.mul(x0, x1)
+    assert isinstance(y, core.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_x0_grad = x0.grad
+    analytical_x1_grad = x1.grad
+
+    # Numerical gradient
+    numerical_x0_grad = numerical_diff(partial(core.mul, x1), x0)
+    numerical_x1_grad = numerical_diff(partial(core.mul, x0), x1)
+
+    # Check if they're close
+    assert np.allclose(analytical_x0_grad, numerical_x0_grad)
+    assert np.allclose(analytical_x1_grad, numerical_x1_grad)
+
+
+def test_neg_backward() -> None:
+    """Test the backward propagation of the neg function."""
+    x = core.tensor(np.array(1.0))
+    y = core.neg(x)
+    assert isinstance(y, core.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(core.neg, x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_sub_backward() -> None:
+    """Test the backward propagation of the sub function."""
+    x = core.tensor(np.array(100.0))
+    y = x - np.array(200.0)
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(partial(core.sub, x1=np.array(200.0)), x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_rsub_backward() -> None:
+    """Test the backward propagation of the rsub function."""
+    x = core.tensor(np.array(100.0))
+    y = np.array(200.0) - x
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(partial(core.rsub, x1=np.array(200.0)), x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_div_backward() -> None:
+    """Test the backward propagation of the div function.(true division)"""
+    x0 = core.tensor(np.array(4.0))
+    x1 = core.tensor(np.array(2.0))
+    y = core.div(x0, x1)
+    assert isinstance(y, core.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x0.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(partial(core.div, x1=x1), x0)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_rdiv_backward() -> None:
+    """Test the backward propagation of the rdiv function.(true division)"""
+    x = core.tensor(np.array(2.0))
+    y = core.rdiv(x, 4)
+    assert isinstance(y, core.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(partial(core.rdiv, x1=4), x)
 
     # Check if they're close
     assert np.allclose(analytical_grad, numerical_grad)
@@ -98,6 +216,8 @@ def test_multi_branch_backward() -> None:
     b = core.square(a)
     c = core.square(a)
     y = core.add(b, c)
+    assert isinstance(y, core.Tensor)
+
     y.backward()
 
     # Analytical gradient
@@ -106,6 +226,7 @@ def test_multi_branch_backward() -> None:
     # Numerical gradient
     grad_b, grad_c = np.array(1), np.array(1)
 
+    assert isinstance(a, core.Tensor)
     grad_a = (
         numerical_diff(core.square, a) * grad_b
         + numerical_diff(core.square, a) * grad_c
@@ -114,6 +235,24 @@ def test_multi_branch_backward() -> None:
     grad_x = numerical_diff(core.square, core.tensor(grad_a))
 
     assert np.allclose(analytical_grad, grad_x)
+
+
+def test_pow_backward() -> None:
+    """Test the backward propagation of the pow function."""
+    x = core.tensor(np.array(2.0))
+    y = core.pow(x, 3)
+    assert isinstance(y, core.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(partial(core.pow, c=3), x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -130,6 +269,10 @@ def test_retain_grad(retain_grad: bool) -> None:
     x1 = core.tensor(np.array(2.0))
     t = core.add(x0, x1)
     y = core.square(t)
+
+    assert isinstance(y, core.Tensor)
+    assert isinstance(t, core.Tensor)
+
     y.backward(retain_grad=retain_grad)
 
     if retain_grad:
@@ -195,11 +338,15 @@ def test_forward_with_no_grad() -> None:
     with core.no_grad():
         y = core.square(x)
 
+    assert isinstance(y, core.Tensor)
+
     # When no_grad is used, the creator is None
     assert y.creator is None
 
     # Now compute with gradients enabled
     y = core.square(x)
+    assert isinstance(y, core.Tensor)
+
     y.backward()
 
     # Gradient should be computed

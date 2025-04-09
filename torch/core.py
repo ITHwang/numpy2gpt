@@ -103,6 +103,11 @@ class Tensor:
     See: https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/variable.h
     """
 
+    # NOTE: set the priority of tensor to be higher than numpy array.
+    # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,
+    # the methods of the tensor will be called.
+    __array_priority__ = 200
+
     def __init__(
         self,
         data: INPUT_TYPE,
@@ -253,8 +258,14 @@ class Tensor:
         self.grad = None
 
 
+def as_tensor(obj: INPUT_TYPE | Tensor) -> Tensor:
+    if isinstance(obj, Tensor):
+        return obj
+    return Tensor(obj)
+
+
 class Function:
-    def __call__(self, *inputs: Tensor) -> Tensor | tuple[Tensor, ...]:
+    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
         """Do forward propagation.
         self.generation: the generation of the function.
             A function gets inputs and outputs.
@@ -272,11 +283,13 @@ class Function:
             when the input is a zero-dimensional array.
 
         Args:
-            inputs: list[Tensor]
+            input_args: list[Tensor] is expected, but also any numeric or array object can be accepted.
 
         Returns:
             Tensor | list[Tensor]
         """
+        inputs: tuple[Tensor, ...] = tuple(as_tensor(input) for input in input_args)
+
         # forward propagation
         xs = tuple(input.data for input in inputs)
         ys = self.forward(*xs)
@@ -371,32 +384,139 @@ class Exp(Function):
         return gx
 
 
-def square(x: np.ndarray) -> np.ndarray:
+class Mul(Function):
+    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+        y = x0 * x1
+
+        return y
+
+    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        gx0 = gy * x1
+        gx1 = gy * x0
+
+        return gx0, gx1
+
+
+class Neg(Function):
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return -x
+
+    def backward(self, gy: np.ndarray) -> np.ndarray:
+        return -gy
+
+
+class Sub(Function):
+    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+        return x0 - x1
+
+    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return gy, -gy
+
+
+class Div(Function):
+    """Divide two tensors element-wise.
+
+    Actually, PyTorch differentiates the division operator in two ways:
+    - torch.div()
+        - If both inputs are integers, it performs floor division.(like '//' in Python 3)
+        - If either input is a float, it performs true division.
+    - torch.true_divide()
+        - Always performs true division, regardless of input types.
+        - The '/' operator between tensors is equivalent to torch.true_divide().
+
+    For simplicity, we only implement true division with the '/' operator.
+    """
+
+    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+        return x0 / x1
+
+    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        gx0 = gy / x1
+        gx1 = -gy * x0 / x1**2
+
+        return gx0, gx1
+
+
+class Pow(Function):
+    def __init__(self, c: int | float) -> None:
+        self.c = c
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return x**self.c
+
+    def backward(self, gy: np.ndarray) -> np.ndarray:
+        x = self.inputs[0].data
+        gx = self.c * x ** (self.c - 1) * gy
+
+        return gx
+
+
+def square(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Square()(x)
 
 
-def exp(x: np.ndarray) -> np.ndarray:
+def exp(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Exp()(x)
 
 
-def add(x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+def add(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
     return Add()(x0, x1)
 
 
+def mul(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Mul()(x0, x1)
+
+
+def neg(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    return Neg()(x)
+
+
+def sub(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Sub()(x0, x1)
+
+
+def rsub(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Sub()(x1, x0)
+
+
+def div(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Div()(x0, x1)
+
+
+def rdiv(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Div()(x1, x0)
+
+
+def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+    return Pow(c)(x)
+
+
+Tensor.__add__ = add  # type: ignore
+Tensor.__radd__ = add  # type: ignore
+Tensor.__mul__ = mul  # type: ignore
+Tensor.__rmul__ = mul  # type: ignore
+Tensor.__neg__ = neg  # type: ignore
+Tensor.__sub__ = sub  # type: ignore
+Tensor.__rsub__ = rsub  # type: ignore
+Tensor.__truediv__ = div  # type: ignore
+Tensor.__rtruediv__ = rdiv  # type: ignore
+Tensor.__pow__ = pow  # type: ignore
+
 if __name__ == "__main__":
-    x0 = Tensor(np.array(1.0))
-    x1 = Tensor(np.array(2.0))
-    t = add(x0, x1)
-    y = square(t)
-    y.backward()
-
-    print(y.grad, t.grad)
-    print(x0.grad, x1.grad)
-
-    x3 = Tensor(np.array([[[1, 2, 3], [4, 5, 6.2]], [[1, 2, 3], [4, 5, 6.2]]]))
-    print(x3.shape)
-    print(x3.ndim)
-    print(x3.size())
-    print(x3.dtype)
-    print(len(x3))
-    print(x3)
+    x = Tensor(np.array(2.0))
+    y = pow(x, 3)
+    print(y)
