@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "loguru>=0.7.3",
+    "memory-profiler>=0.61.0",
     "mypy>=1.15.0",
     "numpy>=2.2.3",
     "pre-commit>=4.1.0",
@@ -23,6 +24,7 @@ lint.isort.known-first-party = ["torch"]
 # `py.typed` file을 가지고 있는 라이브러리는 타입 체킹이 되지만, 없는 라이브러리는 에러가 발생함.
 # 해당 에러 무시
 ignore_missing_imports = true
+disable_error_code = ["operator"]
 
 # https://docs.pytest.org/en/stable/reference/customize.html
 # https://docs.pytest.org/en/stable/explanation/goodpractices.html#choosing-an-import-mode
