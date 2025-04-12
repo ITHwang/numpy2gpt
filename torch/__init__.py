@@ -1,25 +1,4 @@
-# from torch.core_simple import (
-#     Config,
-#     Function,
-#     Tensor,
-#     add,
-#     as_tensor,
-#     div,
-#     exp,  # to be moved to functions.py
-#     mul,
-#     neg,
-#     no_grad,
-#     pow,
-#     rdiv,
-#     rsub,
-#     setup_tensor,
-#     square,  # to be moved to functions.py
-#     sub,
-#     tensor,
-#     using_config,
-# )
-
-from torch.core import (
+from torch.core_simple import (
     Config,
     Function,
     Tensor,
@@ -39,6 +18,27 @@ from torch.core import (
     tensor,
     using_config,
 )
+
+# from torch.core import (
+#     Config,
+#     Function,
+#     Tensor,
+#     add,
+#     as_tensor,
+#     div,
+#     exp,  # to be moved to functions.py
+#     mul,
+#     neg,
+#     no_grad,
+#     pow,
+#     rdiv,
+#     rsub,
+#     setup_tensor,
+#     square,  # to be moved to functions.py
+#     sub,
+#     tensor,
+#     using_config,
+# )
 from torch.types import (
     ARRAY_TYPE,
     INPUT_TYPE,

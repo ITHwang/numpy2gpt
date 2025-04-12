@@ -17,7 +17,7 @@
 
 # Concepts
 
-## Auto Differentiation
+## 1. Auto Differentiation
 1. Auto Differentiation is a core algorithm for neural networks to compute backpropagation by following the chain rule.
 2. To implement the chain rule, we need to satisfy the following requirements:
   - During forward propagation,
@@ -67,11 +67,87 @@
   - To avoid this, we use `weakref.ref` for the outputs of the function.
   - Using weakref.ref for output tensors eliminates circular references, reducing memory usage by 72% (from 136.4 MiB to 38.2 MiB) in our test([measure_memory.py](./torch/measure_memory.py)).
 
+## 2. Define-by-Run vs. Define-and-Run
+
+There are two fundamental paradigms for implementing automatic differentiation and building neural networks:
+
+### 2.1. Define-and-Run
+
+In the Define-and-Run paradigm, the entire computational graph is constructed before execution.
+
+- The computational graph is fully defined, analyzed, and compiled before any data flows through it
+- Once defined, the same graph processes all input data without changing its structure
+- Examples: TensorFlow 1.x, Theano, Caffe
+
+**Key characteristics:**
+- Clear separation between graph definition and execution phases
+- Graph optimization happens during compilation, improving performance
+- Easier to deploy to production environments and non-Python platforms
+- Well-suited for distributed computing across multiple devices
+- More difficult to debug as errors often occur in the compiled graph
+- Less flexible for dynamic computational patterns
+
+### 2.2. Define-by-Run
+
+In the Define-by-Run paradigm, the computational graph is constructed dynamically during execution.
+
+- The computational graph is created on-the-fly as operations are performed
+- Each forward pass can potentially create a different graph structure
+- Examples: PyTorch, TensorFlow Eager mode, Chainer
+
+**Key characteristics:**
+- No separate compilation step; operations execute immediately
+- More Pythonic approach, using native control flow statements
+- Easier to debug as errors occur at the point of operation
+- More intuitive development experience with standard Python tools
+- Supports dynamic models where graph structure depends on input data
+- May sacrifice some optimization opportunities available in static graphs
+
+### 2.3. Summary
+
+| Feature | Define-and-Run | Define-by-Run |
+|---------|---------------|---------------|
+| Graph Construction | Pre-compiled static graph | Dynamic graph built during execution |
+| Programming Style | Domain-specific language | Native Python code |
+| Debugging | Harder (debugging compiled graph) | Easier (standard Python debugging) |
+| Performance | Potentially better (global optimization) | Potentially worse (less optimization) |
+| Flexibility | Less flexible for dynamic patterns | More flexible for dynamic patterns |
+| Deployment | Easier to deploy to production/devices | More dependent on Python runtime |
+| Learning Curve | Steeper | More intuitive for Python developers |
+| Use Cases | Production deployment, mobile/edge devices | Research, rapid prototyping |
+| Examples | TensorFlow 1.x, Theano | PyTorch, TensorFlow Eager |
+
+This implementation follows the Define-by-Run paradigm, similar to PyTorch.
+
 # Features
 
-## Tensor Operations
-- See: [Tensor Playground](https://www.kaggle.com/code/reichenbch/tensor-playground)
-- TBD
+## 1. Tensor Operations
+
+This library implements a subset of PyTorch's tensor operations from scratch using NumPy as the underlying computation engine. All operations support automatic differentiation.
+
+### 1.1. Supported Operations
+
+- **Creation**: `torch.tensor()` - Create tensors from Python scalars, lists, or NumPy arrays
+- **Arithmetic**: Addition (`+`), Subtraction (`-`), Multiplication (`*`), Division (`/`), Negation (`-`)
+- **Mathematical**: `square()`, `exp()`, `pow()`
+
+### 1.2. Autograd Support
+
+```python
+# Example of autograd
+x = torch.tensor([2.0], requires_grad=True)
+y = x**2 + 1  # Forward pass
+y.backward()  # Backward pass
+print(x.grad)  # Access gradients
+```
+
+### 1.3. Properties
+
+- **Define-by-Run**: Computational graph is constructed dynamically during execution
+- **Type Safety**: Only floating-point tensors can require gradients
+- **No-grad Mode**: Context manager to disable gradient tracking during inference
+- **Gradient Accumulation**: Support for complex computational graphs
+- **Memory Optimization**: Uses weak references to avoid circular reference memory leaks
 
 # References
 - [pytorch](https://github.com/pytorch/pytorch)
