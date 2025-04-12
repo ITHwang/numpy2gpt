@@ -59,6 +59,7 @@ def tensor(
     data: types.INPUT_TYPE | None = None,
     name: str | None = None,
     dtype: types.TORCH_TYPE | None = None,
+    requires_grad: bool = False,
 ) -> Tensor:
     """An imitation of torch.tensor in PyTorch
 
@@ -66,7 +67,7 @@ def tensor(
     Python binding code:
         https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/python_torch_functions_manual.cpp#L243-L267
     """
-    return Tensor(data, name, dtype)
+    return Tensor(data, name, dtype, requires_grad)
 
 
 class Tensor:
@@ -89,6 +90,7 @@ class Tensor:
         data: types.INPUT_TYPE,
         name: str | None = None,
         dtype: types.TORCH_TYPE | None = None,
+        requires_grad: bool = False,
     ) -> None:
         """
         self.grad: numpy.ndarray | None
@@ -97,6 +99,7 @@ class Tensor:
             Similarly, in PyTorch `Variable`s have the notion of a `gradient_edge`, which is the
             edge in the autograd graph that connects the variable to a particular input
             of the gradient function(`grad_fn` or `grad_accumulator`).
+        self.grad_fn: The exactly same as self.creator, just for making this class more like PyTorch.
         self.generation: the generation of the tensor.
             A function gets inputs and outputs.
             e.g., [input] -> [function] -> [output]
@@ -113,6 +116,7 @@ class Tensor:
             data: numpy.ndarray | int | float | None
             name: You can give a name to the tensor. This is useful for debugging.
             dtype: The dtype of the tensor. If None, the dtype will be the same as the type of the data.
+            requires_grad: Whether to require gradients for the tensor.
         """
         if isinstance(data, np.ndarray):
             pass
@@ -134,21 +138,51 @@ class Tensor:
                 case _:
                     raise ValueError(f"Unsupported dtype: {dtype}")
 
-        self.data = data
+        if (
+            requires_grad
+            and isinstance(data, np.ndarray)
+            and data.dtype
+            not in (
+                np.float32,
+                np.float64,
+            )
+        ):
+            raise RuntimeError(
+                "Only Tensors of floating point and complex dtype can require gradients"
+            )
+
+        self._data = data
         self.name = name
         self.grad: np.ndarray | None = None
-        self.creator: Function | None = None
+        self._creator: Function | None = None
         self.generation: int = 0
+        self.requires_grad = requires_grad
 
     def __len__(self) -> int:
-        if not isinstance(self.data, Sized):
+        if not isinstance(self._data, Sized):
             raise TypeError("len() of unsized object")
 
-        return len(self.data)
+        return len(self._data)
 
     def __repr__(self) -> str:
-        p = str(self.data).replace("\n", "\n" + " " * 7)
-        return f"tensor({p}, dtype={self.dtype})"
+        p = str(self._data).replace("\n", "\n" + " " * 7)
+
+        if self.creator:
+            return f"tensor({p}, dtype={self.dtype}, grad_fn={self.creator})"
+        elif self.requires_grad:
+            return f"tensor({p}, dtype={self.dtype}, requires_grad=True)"
+        else:
+            return f"tensor({p}, dtype={self.dtype})"
+
+    @property
+    def data(self) -> np.ndarray:
+        """TODO: This method should detach the tensor from the computational graph.
+
+        In PyTorch, this method is implemented by `Tensor.data`.
+        But This attribute is kinda legacy, and it is not recommended to use it in modern PyTorch.
+        We should implement this method though.
+        """
+        raise NotImplementedError
 
     @property
     def creator(self) -> Function | None:
@@ -159,8 +193,16 @@ class Tensor:
         self._creator = func
 
     @property
+    def grad_fn(self) -> Function | None:
+        return self._creator
+
+    @grad_fn.setter
+    def grad_fn(self, func: Function) -> None:
+        self._creator = func
+
+    @property
     def ndim(self) -> int:
-        item_: np.ndarray = self.data
+        item_: np.ndarray = self._data
 
         return int(item_.ndim)
 
@@ -170,7 +212,7 @@ class Tensor:
 
     @property
     def dtype(self) -> types.TORCH_TYPE:
-        item_: np.ndarray = self.data
+        item_: np.ndarray = self._data
 
         match item_.dtype:
             case np.int32:
@@ -185,12 +227,12 @@ class Tensor:
                 raise ValueError(f"Unsupported dtype: {item_.dtype}")
 
     def size(self) -> Size:
-        item_: np.ndarray = self.data
+        item_: np.ndarray = self._data
 
         return Size(*item_.shape)
 
     def item(self) -> types.NUMERIC_TYPE:
-        data_: np.ndarray = self.data
+        data_: np.ndarray = self._data
 
         if data_.size > 1:
             raise ValueError(
@@ -229,10 +271,21 @@ class Tensor:
                 We finally use only the gradient of the "first" input tensor.(dy/dx)
                 So, we set it to False by default.
         """
-        # if the gradient is not set, set it to 1.0
-        # this is because dy/dy = 1.0
         if self.grad is None:
-            self.grad = np.ones_like(self.data)
+            if self.requires_grad:
+                # if the gradient is not set, set it to 1.0
+                # this is because dy/dy = 1.0
+                self.grad = np.ones_like(self._data)
+            elif self._creator is None:
+                # The final output tensor of the computational graph does not require grad.
+                raise RuntimeError(
+                    "element 0 of tensors does not require grad and does not have a grad_fn"
+                )
+            else:
+                # This is an anomaly.
+                raise RuntimeError(
+                    "This is the case that is not considered yet. MUST fix it."
+                )
 
         funcs: PriorityQueue[Function] = PriorityQueue()
         seen_set: set[Function] = set()
@@ -251,9 +304,9 @@ class Tensor:
                 seen_set.add(f)
 
         # push the creator which creates the final output
-        if self.creator is None:
+        if self._creator is None:
             raise ValueError("The final output should have a creator")
-        add_func(self.creator)
+        add_func(self._creator)
 
         while funcs:
             f = funcs.pop()
@@ -323,18 +376,23 @@ class Function:
         inputs: tuple[Tensor, ...] = tuple(as_tensor(input) for input in input_args)
 
         # forward propagation
-        xs = tuple(input.data for input in inputs)
+        xs = tuple(input._data for input in inputs)
         ys = self.forward(*xs)
         if not isinstance(ys, tuple):
             ys = (ys,)
-        outputs = tuple(Tensor(y) for y in ys)
+
+        # If any input requires grad, the output should require grad.
+        should_outputs_require_grad: bool = any(input.requires_grad for input in inputs)
+        outputs = tuple(
+            Tensor(y, requires_grad=should_outputs_require_grad) for y in ys
+        )
 
         # When only inferencing, we can skip the logic below which is needed for backpropagation.
-        if Config.enable_backprop:
+        if Config.enable_backprop and should_outputs_require_grad:
             # If the generations of inputs are different, the higher generation will be the one of the function.
             self.generation = max([input.generation for input in inputs])
 
-            # set the creator of the output
+            # set the creator(a.k.a. grad_fn) of the output
             for output in outputs:
                 output.creator = self
 
@@ -389,7 +447,7 @@ class Square(Function):
             raise ValueError("Square must take one argument")
 
         gy = gys[0]
-        x = self.inputs[0].data
+        x = self.inputs[0]._data
         gx = 2 * x * gy
 
         return gx
@@ -410,7 +468,7 @@ class Exp(Function):
             raise ValueError("Exp must take one argument")
 
         gy = gys[0]
-        x = self.inputs[0].data
+        x = self.inputs[0]._data
         gx = np.exp(x) * gy
 
         return gx
@@ -423,7 +481,7 @@ class Mul(Function):
         return y
 
     def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs[0]._data, self.inputs[1]._data
         gx0 = gy * x1
         gx1 = gy * x0
 
@@ -464,8 +522,8 @@ class Div(Function):
         return x0 / x1
 
     def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x0: np.ndarray = self.inputs[0].data
-        x1: np.ndarray = self.inputs[1].data
+        x0: np.ndarray = self.inputs[0]._data
+        x1: np.ndarray = self.inputs[1]._data
 
         gx0 = gy / x1
         gx1 = -gy * x0 / x1**2
@@ -481,7 +539,7 @@ class Pow(Function):
         return x**self.c
 
     def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0].data
+        x: np.ndarray = self.inputs[0]._data
         gx = self.c * x ** (self.c - 1) * gy
 
         return gx

@@ -25,13 +25,13 @@ def numerical_diff(
         x: The input Tensor.
         eps: The epsilon value for numerical differentiation.
     """
-    x_data: np.ndarray = x.data
+    x_data: np.ndarray = x._data
     x0 = torch.tensor(x_data - eps)
     x1 = torch.tensor(x_data + eps)
     y0 = f(x0)
     y1 = f(x1)
 
-    return float((y1.data - y0.data) / (2 * eps))  # type: ignore
+    return float((y1._data - y0._data) / (2 * eps))  # type: ignore
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -52,7 +52,7 @@ def numerical_diff(
 def test_tensor_init(input_data: torch.INPUT_TYPE) -> None:
     """If the input is numeric or array, it is converted to a numpy array."""
     t = torch.tensor(input_data)
-    assert isinstance(t.data, np.ndarray)
+    assert isinstance(t._data, np.ndarray)
 
 
 def test_tensor_init_with_invalid_type() -> None:
@@ -63,7 +63,7 @@ def test_tensor_init_with_invalid_type() -> None:
 
 def test_square_backward() -> None:
     """Test the backward propagation of the square function."""
-    x = torch.tensor(np.array(2.0))
+    x = torch.tensor(np.array(2.0), requires_grad=True)
     y = torch.square(x)
     assert isinstance(y, torch.Tensor)
 
@@ -81,7 +81,7 @@ def test_square_backward() -> None:
 
 def test_exp_backward() -> None:
     """Test the backward propagation of the exp function."""
-    x = torch.tensor(np.array(1.0))
+    x = torch.tensor(np.array(1.0), requires_grad=True)
     y = torch.exp(x)
     assert isinstance(y, torch.Tensor)
 
@@ -99,8 +99,8 @@ def test_exp_backward() -> None:
 
 def test_mul_backward() -> None:
     """Test the backward propagation of the mul function."""
-    x0 = torch.tensor(np.array(2.0))
-    x1 = torch.tensor(np.array(3.0))
+    x0 = torch.tensor(np.array(2.0), requires_grad=True)
+    x1 = torch.tensor(np.array(3.0), requires_grad=True)
 
     y = torch.mul(x0, x1)
     assert isinstance(y, torch.Tensor)
@@ -122,7 +122,7 @@ def test_mul_backward() -> None:
 
 def test_neg_backward() -> None:
     """Test the backward propagation of the neg function."""
-    x = torch.tensor(np.array(1.0))
+    x = torch.tensor(np.array(1.0), requires_grad=True)
     y = torch.neg(x)
     assert isinstance(y, torch.Tensor)
 
@@ -140,7 +140,7 @@ def test_neg_backward() -> None:
 
 def test_sub_backward() -> None:
     """Test the backward propagation of the sub function."""
-    x = torch.tensor(np.array(100.0))
+    x = torch.tensor(np.array(100.0), requires_grad=True)
     y = x - np.array(200.0)
     y.backward()
 
@@ -156,7 +156,7 @@ def test_sub_backward() -> None:
 
 def test_rsub_backward() -> None:
     """Test the backward propagation of the rsub function."""
-    x = torch.tensor(np.array(100.0))
+    x = torch.tensor(np.array(100.0), requires_grad=True)
     y = np.array(200.0) - x
     y.backward()
 
@@ -172,8 +172,8 @@ def test_rsub_backward() -> None:
 
 def test_div_backward() -> None:
     """Test the backward propagation of the div function.(true division)"""
-    x0 = torch.tensor(np.array(4.0))
-    x1 = torch.tensor(np.array(2.0))
+    x0 = torch.tensor(np.array(4.0), requires_grad=True)
+    x1 = torch.tensor(np.array(2.0), requires_grad=True)
     y = torch.div(x0, x1)
     assert isinstance(y, torch.Tensor)
 
@@ -191,7 +191,7 @@ def test_div_backward() -> None:
 
 def test_rdiv_backward() -> None:
     """Test the backward propagation of the rdiv function.(true division)"""
-    x = torch.tensor(np.array(2.0))
+    x = torch.tensor(np.array(2.0), requires_grad=True)
     y = torch.rdiv(x, 4)
     assert isinstance(y, torch.Tensor)
 
@@ -215,7 +215,7 @@ def test_multi_branch_backward() -> None:
                         |                          |
                         ----> [square] -> (c) ------
     """
-    x = torch.tensor(np.array(1.0))
+    x = torch.tensor(np.array(1.0), requires_grad=True)
     a = torch.square(x)
     b = torch.square(a)
     c = torch.square(a)
@@ -243,7 +243,7 @@ def test_multi_branch_backward() -> None:
 
 def test_pow_backward() -> None:
     """Test the backward propagation of the pow function."""
-    x = torch.tensor(np.array(2.0))
+    x = torch.tensor(np.array(2.0), requires_grad=True)
     y = torch.pow(x, 3)
     assert isinstance(y, torch.Tensor)
 
@@ -269,8 +269,8 @@ def test_retain_grad(retain_grad: bool) -> None:
     If retain_grad is True, the gradient of the tensor is not None.
     If retain_grad is False, the gradient of the tensor is None.
     """
-    x0 = torch.tensor(np.array(1.0))
-    x1 = torch.tensor(np.array(2.0))
+    x0 = torch.tensor(np.array(1.0), requires_grad=True)
+    x1 = torch.tensor(np.array(2.0), requires_grad=True)
     t = torch.add(x0, x1)
     y = torch.square(t)
 
@@ -337,7 +337,7 @@ def test_forward_with_no_grad() -> None:
     When using no_grad, the creator of the tensor is None.
     When using gradients enabled, the creator of the tensor is not None.
     """
-    x = torch.tensor(np.array(2.0))
+    x = torch.tensor(np.array(2.0), requires_grad=True)
 
     with torch.no_grad():
         y = torch.square(x)
@@ -429,7 +429,7 @@ def test_dtype_cast() -> None:
     t_int32 = torch.tensor(np.array([1.5, 2.5, 3.5]), dtype=torch.int32)
     assert t_int32.dtype == torch.int32
     # Check that values were truncated during casting
-    assert np.array_equal(t_int32.data, np.array([1, 2, 3], dtype=np.int32))
+    assert np.array_equal(t_int32._data, np.array([1, 2, 3], dtype=np.int32))
 
 
 def test_dtype_unsupported() -> None:
@@ -439,9 +439,73 @@ def test_dtype_unsupported() -> None:
 
     # Monkey patch the data attribute with an unsupported dtype
     # Using bool dtype which isn't in the supported types
-    t.data = np.array([True, False, True], dtype=np.bool_)
+    t._data = np.array([True, False, True], dtype=np.bool_)
 
     with pytest.raises(ValueError) as excinfo:
         dtype = t.dtype
 
     assert "Unsupported dtype" in str(excinfo.value)
+
+
+def test_requires_grad_with_non_float_dtype() -> None:
+    """Test that creating tensors with non-floating point dtypes and requires_grad=True raises an error."""
+    # Test with int32
+    with pytest.raises(RuntimeError) as excinfo:
+        t = torch.tensor(np.array([1, 2, 3], dtype=np.int32), requires_grad=True)
+    assert (
+        "Only Tensors of floating point and complex dtype can require gradients"
+        in str(excinfo.value)
+    )
+
+    # Test with int64
+    with pytest.raises(RuntimeError) as excinfo:
+        t = torch.tensor(np.array([1, 2, 3], dtype=np.int64), requires_grad=True)
+    assert (
+        "Only Tensors of floating point and complex dtype can require gradients"
+        in str(excinfo.value)
+    )
+
+    # Verify that floating point types work with requires_grad=True
+    t_float32 = torch.tensor(
+        np.array([1.0, 2.0, 3.0], dtype=np.float32), requires_grad=True
+    )
+    assert t_float32.requires_grad is True
+
+    t_float64 = torch.tensor(
+        np.array([1.0, 2.0, 3.0], dtype=np.float64), requires_grad=True
+    )
+    assert t_float64.requires_grad is True
+
+
+def test_backward_without_requires_grad() -> None:
+    """Test that calling backward on a tensor without requires_grad raises an error."""
+    # Create a tensor without requires_grad
+    x = torch.tensor(np.array([1.0, 2.0, 3.0], dtype=np.float32), requires_grad=False)
+
+    # Try calling backward on it
+    with pytest.raises(RuntimeError) as excinfo:
+        x.backward()
+
+    assert (
+        "element 0 of tensors does not require grad and does not have a grad_fn"
+        in str(excinfo.value)
+    )
+
+    # Create a tensor that is the result of an operation but doesn't require grad
+    with torch.no_grad():
+        a = torch.tensor(np.array([1.0], dtype=np.float32))
+        b = torch.tensor(np.array([2.0], dtype=np.float32))
+        c = a + b  # This tensor has a creator but doesn't require grad
+
+    # This should work because c has a creator (Function) even though requires_grad=False
+    # The error about "This is the case that is not considered yet" won't be raised
+    # because we're not hitting that case - no_grad() disables the creation of grad_fn
+    assert c._creator is None
+
+    with pytest.raises(RuntimeError) as excinfo:
+        c.backward()
+
+    assert (
+        "element 0 of tensors does not require grad and does not have a grad_fn"
+        in str(excinfo.value)
+    )
