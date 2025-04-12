@@ -6,6 +6,8 @@ import pytest
 
 import torch
 
+from .utils import goldstein, matyas, sphere
+
 
 def numerical_diff(
     f: Callable[
@@ -31,7 +33,21 @@ def numerical_diff(
     y0 = f(x0)
     y1 = f(x1)
 
-    return float((y1._data - y0._data) / (2 * eps))  # type: ignore
+    assert isinstance(y0, torch.Tensor), (
+        "The case that the output is a tuple of Tensors is not considered yet. "
+        "If you met the case, please implement."
+    )
+    assert isinstance(y1, torch.Tensor), (
+        "The case that the output is a tuple of Tensors is not considered yet. "
+        "If you met the case, please implement."
+    )
+
+    numerator = y1._data - y0._data
+    if isinstance(numerator, np.ndarray) and numerator.size == 1:
+        numerator = float(numerator[0])
+    denominator = 2 * eps
+
+    return numerator / denominator
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -509,3 +525,78 @@ def test_backward_without_requires_grad() -> None:
         "element 0 of tensors does not require grad and does not have a grad_fn"
         in str(excinfo.value)
     )
+
+
+def test_sphere_function_backward() -> None:
+    """Test gradients of the sphere function using numerical differentiation."""
+    # Create input tensors
+    x = torch.tensor([2.0], requires_grad=True)
+    y = torch.tensor([3.0], requires_grad=True)
+
+    # Forward pass
+    z = sphere(x, y)
+
+    # Backward pass (analytical gradient)
+    z.backward()
+
+    # Get analytical gradients
+    dx_analytical = x.grad
+    dy_analytical = y.grad
+
+    # Calculate numerical gradients
+    dx_numerical = numerical_diff(lambda x: sphere(x, y), x)
+    dy_numerical = numerical_diff(lambda y: sphere(x, y), y)
+
+    # Check if they match
+    assert np.allclose(dx_analytical, dx_numerical)
+    assert np.allclose(dy_analytical, dy_numerical)
+
+
+def test_goldstein_function_backward() -> None:
+    """Test gradients of the Goldstein-Price function using numerical differentiation."""
+    # Create input tensors
+    x = torch.tensor([-0.5], requires_grad=True)
+    y = torch.tensor([0.5], requires_grad=True)
+
+    # Forward pass
+    z = goldstein(x, y)
+
+    # Backward pass (analytical gradient)
+    z.backward()
+
+    # Get analytical gradients
+    dx_analytical = x.grad
+    dy_analytical = y.grad
+
+    # Calculate numerical gradients
+    dx_numerical = numerical_diff(lambda x: goldstein(x, y), x)
+    dy_numerical = numerical_diff(lambda y: goldstein(x, y), y)
+
+    # Check if they match
+    assert np.allclose(dx_analytical, dx_numerical, rtol=1e-3, atol=1e-3)
+    assert np.allclose(dy_analytical, dy_numerical, rtol=1e-3, atol=1e-3)
+
+
+def test_matyas_function_backward() -> None:
+    """Test gradients of the Matyas function using numerical differentiation."""
+    # Create input tensors
+    x = torch.tensor([1.5], requires_grad=True)
+    y = torch.tensor([2.0], requires_grad=True)
+
+    # Forward pass
+    z = matyas(x, y)
+
+    # Backward pass (analytical gradient)
+    z.backward()
+
+    # Get analytical gradients
+    dx_analytical = x.grad
+    dy_analytical = y.grad
+
+    # Calculate numerical gradients
+    dx_numerical = numerical_diff(lambda x: matyas(x, y), x)
+    dy_numerical = numerical_diff(lambda y: matyas(x, y), y)
+
+    # Check if they match
+    assert np.allclose(dx_analytical, dx_numerical)
+    assert np.allclose(dy_analytical, dy_numerical)
