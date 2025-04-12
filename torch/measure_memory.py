@@ -1,7 +1,8 @@
 import numpy as np
 from memory_profiler import profile
 
-from torch.core import square, tensor
+import torch
+from torch import Tensor
 
 
 @profile  # type: ignore
@@ -17,9 +18,10 @@ def main() -> None:
     """
 
     for _ in range(10000):
-        x = tensor(np.random.randn(10000))
-        y = square(square(square(x)))
-        y.backward()
+        x: Tensor = torch.tensor(np.random.randn(10000))
+        y = torch.square(torch.square(torch.square(x)))
+        if isinstance(y, Tensor):
+            y.backward()
 
 
 if __name__ == "__main__":
