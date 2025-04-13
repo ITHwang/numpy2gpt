@@ -6,7 +6,7 @@ import pytest
 
 import torch
 
-from .utils import goldstein, matyas, sphere
+from .complex_funcs import goldstein, matyas, sphere
 
 
 def numerical_diff(

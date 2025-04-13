@@ -57,9 +57,9 @@ class Size:
 
 def tensor(
     data: types.INPUT_TYPE | None = None,
-    name: str | None = None,
     dtype: types.TORCH_TYPE | None = None,
     requires_grad: bool = False,
+    name: str | None = None,
 ) -> Tensor:
     """An imitation of torch.tensor in PyTorch
 
@@ -67,7 +67,7 @@ def tensor(
     Python binding code:
         https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/python_torch_functions_manual.cpp#L243-L267
     """
-    return Tensor(data, name, dtype, requires_grad)
+    return Tensor(data, dtype, requires_grad, name)
 
 
 class Tensor:
@@ -88,9 +88,9 @@ class Tensor:
     def __init__(
         self,
         data: types.INPUT_TYPE,
-        name: str | None = None,
         dtype: types.TORCH_TYPE | None = None,
         requires_grad: bool = False,
+        name: str | None = None,
     ) -> None:
         """
         self.grad: numpy.ndarray | None
@@ -114,9 +114,9 @@ class Tensor:
 
         Args:
             data: numpy.ndarray | int | float | None
-            name: You can give a name to the tensor. This is useful for debugging.
             dtype: The dtype of the tensor. If None, the dtype will be the same as the type of the data.
             requires_grad: Whether to require gradients for the tensor.
+            name: You can give a name to the tensor. This is useful for debugging and visualization.
         """
         if isinstance(data, np.ndarray):
             pass

@@ -149,6 +149,68 @@ print(x.grad)  # Access gradients
 - **Gradient Accumulation**: Support for complex computational graphs
 - **Memory Optimization**: Uses weak references to avoid circular reference memory leaks
 
+## 2. Neural Network Visualization
+
+The library provides robust tools for visualizing computational graphs, which helps understand the flow of tensors through operations:
+
+- Generate DOT representations of computational graphs
+- Visualize graphs in multiple formats (PNG, SVG, PDF, etc.)
+- Display tensor shapes, names, and data types
+- Follow the computation chain backward from outputs to inputs
+
+### 2.1. Requirements
+
+- Graphviz must be installed on your system for generating image files
+  - [Installation instructions](https://www.graphviz.org/download)
+  - macOS: `brew install graphviz`
+  - Ubuntu/Debian: `apt-get install graphviz`
+  - Windows: Download installer from the Graphviz website
+
+### 2.2. Basic Usage
+- Code
+  ```python
+  import torch
+  from torch.utils import plot_dot_graph
+  from tests.torch.complex_funcs import goldstein
+
+  x = torch.tensor(1.0, requires_grad=True, name="x")
+  y = torch.tensor(1.0, requires_grad=True, name="y")
+  z: torch.Tensor = goldstein(x, y)
+  z.backward()
+
+  x.name = "x"
+  y.name = "y"
+  z.name = "z"
+  plot_dot_graph(z, "goldstein.png", verbose=True)
+  ```
+- Output
+  ![visualization_goldstein](./asset/img/visualization_goldstein.png)
+
+
+### 2.3. Details
+- The visualization can be exported in any format supported by Graphviz:
+  ```python
+  # DOT file (raw graph definition)
+  plot_dot_graph(z, "graph.dot", verbose=True)
+
+  # Image formats
+  plot_dot_graph(z, "graph.png", verbose=True)  # PNG
+  plot_dot_graph(z, "graph.svg", verbose=True)  # SVG
+  plot_dot_graph(z, "graph.pdf", verbose=True)  # PDF
+  ```
+- The `verbose` parameter controls the amount of information displayed:
+  ```python
+  # Minimal visualization (just the graph structure)
+  plot_dot_graph(z, "minimal_graph.png", verbose=False)
+
+  # Detailed visualization (with tensor names, shapes, and dtypes)
+  plot_dot_graph(z, "detailed_graph.png", verbose=True)
+- Understanding the Graph
+  - **Orange nodes**: Tensor objects (inputs and intermediate values)
+  - **Green nodes**: Named tensor objects (when verbose=True and tensor has a name)
+  - **Blue boxes**: Operations (functions that transform tensors)
+  - **Arrows**: Data flow direction between operations and tensors
+
 # References
 - [pytorch](https://github.com/pytorch/pytorch)
 - [PyTorch Pocket Reference](https://www.oreilly.com/library/view/pytorch-pocket-reference/9781492089995)
