@@ -29,6 +29,8 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync
+      - name: Install graphviz
+        run: sudo apt update && sudo apt install -y graphviz
       - name: pre-commit
         run: pre-commit
     
