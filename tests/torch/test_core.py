@@ -6,7 +6,7 @@ import pytest
 
 import torch
 
-from .utils import goldstein, matyas, sphere
+from .complex_funcs import goldstein, matyas, sphere
 
 
 def numerical_diff(
@@ -600,3 +600,39 @@ def test_matyas_function_backward() -> None:
     # Check if they match
     assert np.allclose(dx_analytical, dx_numerical)
     assert np.allclose(dy_analytical, dy_numerical)
+
+
+def test_sin_backward() -> None:
+    """Test the backward propagation of the sin function."""
+    x = torch.tensor(np.array(1.0), requires_grad=True)
+    y = torch.sin(x)
+    assert isinstance(y, torch.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(torch.sin, x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_cos_backward() -> None:
+    """Test the backward propagation of the cos function."""
+    x = torch.tensor(np.array(1.0), requires_grad=True)
+    y = torch.cos(x)
+    assert isinstance(y, torch.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(torch.cos, x)
+
+    # Check if they're close
+    assert np.allclose(analytical_grad, numerical_grad)
