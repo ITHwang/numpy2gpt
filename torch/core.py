@@ -545,6 +545,28 @@ class Pow(Function):
         return gx
 
 
+class Sin(Function):
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return np.sin(x)
+
+    def backward(self, gy: np.ndarray) -> np.ndarray:
+        x: np.ndarray = self.inputs[0]._data
+        gx = gy * np.cos(x)
+
+        return gx
+
+
+class Cos(Function):
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return np.cos(x)
+
+    def backward(self, gy: np.ndarray) -> np.ndarray:
+        x: np.ndarray = self.inputs[0]._data
+        gx = -gy * np.sin(x)
+
+        return gx
+
+
 def square(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Square()(x)
 
@@ -595,6 +617,14 @@ def rdiv(
 
 def pow(x: types.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
     return Pow(c)(x)
+
+
+def sin(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    return Sin()(x)
+
+
+def cos(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    return Cos()(x)
 
 
 def setup_tensor() -> None:
