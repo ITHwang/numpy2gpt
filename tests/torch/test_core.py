@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import torch
+from torch import Tensor
 
 from .complex_funcs import goldstein, matyas, sphere
 
@@ -92,6 +93,8 @@ def test_square_backward() -> None:
     numerical_grad = numerical_diff(torch.square, x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -110,6 +113,8 @@ def test_exp_backward() -> None:
     numerical_grad = numerical_diff(torch.exp, x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -132,6 +137,10 @@ def test_mul_backward() -> None:
     numerical_x1_grad = numerical_diff(partial(torch.mul, x0), x1)
 
     # Check if they're close
+    assert analytical_x0_grad is not None
+    assert analytical_x1_grad is not None
+    assert numerical_x0_grad is not None
+    assert numerical_x1_grad is not None
     assert np.allclose(analytical_x0_grad, numerical_x0_grad)
     assert np.allclose(analytical_x1_grad, numerical_x1_grad)
 
@@ -151,6 +160,8 @@ def test_neg_backward() -> None:
     numerical_grad = numerical_diff(torch.neg, x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -167,6 +178,8 @@ def test_sub_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.sub, x1=np.array(200.0)), x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -183,6 +196,8 @@ def test_rsub_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.rsub, x1=np.array(200.0)), x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -202,6 +217,8 @@ def test_div_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.div, x1=x1), x0)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -220,6 +237,8 @@ def test_rdiv_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.rdiv, x1=4), x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -232,11 +251,18 @@ def test_multi_branch_backward() -> None:
                         ----> [square] -> (c) ------
     """
     x = torch.tensor(np.array(1.0), requires_grad=True)
+
     a = torch.square(x)
+    assert isinstance(a, Tensor)
+
     b = torch.square(a)
+    assert isinstance(b, Tensor)
+
     c = torch.square(a)
+    assert isinstance(c, Tensor)
+
     y = torch.add(b, c)
-    assert isinstance(y, torch.Tensor)
+    assert isinstance(y, Tensor)
 
     y.backward()
 
@@ -254,6 +280,8 @@ def test_multi_branch_backward() -> None:
 
     grad_x = numerical_diff(torch.square, torch.tensor(grad_a))
 
+    assert analytical_grad is not None
+    assert grad_x is not None
     assert np.allclose(analytical_grad, grad_x)
 
 
@@ -272,6 +300,8 @@ def test_pow_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.pow, c=3), x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -287,11 +317,12 @@ def test_retain_grad(retain_grad: bool) -> None:
     """
     x0 = torch.tensor(np.array(1.0), requires_grad=True)
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
-    t = torch.add(x0, x1)
-    y = torch.square(t)
 
-    assert isinstance(y, torch.Tensor)
-    assert isinstance(t, torch.Tensor)
+    t = torch.add(x0, x1)
+    assert isinstance(t, Tensor)
+
+    y = torch.square(t)
+    assert isinstance(y, Tensor)
 
     y.backward(retain_grad=retain_grad)
 
@@ -548,6 +579,10 @@ def test_sphere_function_backward() -> None:
     dy_numerical = numerical_diff(lambda y: sphere(x, y), y)
 
     # Check if they match
+    assert dx_analytical is not None
+    assert dy_analytical is not None
+    assert dx_numerical is not None
+    assert dy_numerical is not None
     assert np.allclose(dx_analytical, dx_numerical)
     assert np.allclose(dy_analytical, dy_numerical)
 
@@ -573,6 +608,10 @@ def test_goldstein_function_backward() -> None:
     dy_numerical = numerical_diff(lambda y: goldstein(x, y), y)
 
     # Check if they match
+    assert dx_analytical is not None
+    assert dy_analytical is not None
+    assert dx_numerical is not None
+    assert dy_numerical is not None
     assert np.allclose(dx_analytical, dx_numerical, rtol=1e-3, atol=1e-3)
     assert np.allclose(dy_analytical, dy_numerical, rtol=1e-3, atol=1e-3)
 
@@ -598,6 +637,10 @@ def test_matyas_function_backward() -> None:
     dy_numerical = numerical_diff(lambda y: matyas(x, y), y)
 
     # Check if they match
+    assert dx_analytical is not None
+    assert dy_analytical is not None
+    assert dx_numerical is not None
+    assert dy_numerical is not None
     assert np.allclose(dx_analytical, dx_numerical)
     assert np.allclose(dy_analytical, dy_numerical)
 
@@ -617,6 +660,8 @@ def test_sin_backward() -> None:
     numerical_grad = numerical_diff(torch.sin, x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
 
 
@@ -635,4 +680,6 @@ def test_cos_backward() -> None:
     numerical_grad = numerical_diff(torch.cos, x)
 
     # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
