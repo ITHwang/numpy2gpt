@@ -48,7 +48,7 @@ def numerical_diff(
         numerator = float(numerator[0])
     denominator = 2 * eps
 
-    return numerator / denominator
+    return float(numerator / denominator)
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -491,7 +491,7 @@ def test_dtype_unsupported() -> None:
     with pytest.raises(ValueError) as excinfo:
         dtype = t.dtype
 
-    assert "Unsupported dtype" in str(excinfo.value)
+    assert "Unsupported NumPy dtype" in str(excinfo.value)
 
 
 def test_requires_grad_with_non_float_dtype() -> None:
@@ -683,3 +683,76 @@ def test_cos_backward() -> None:
     assert analytical_grad is not None
     assert numerical_grad is not None
     assert np.allclose(analytical_grad, numerical_grad)
+
+
+def test_tensor_data_getter() -> None:
+    """Test the `data` property getter returns a detached tensor."""
+    x_data = np.array([1.0, 2.0], dtype=np.float32)
+    x = torch.tensor(x_data, requires_grad=True)
+    y = torch.square(x)  # Create some history
+
+    assert isinstance(y, Tensor)
+
+    data_tensor = y.data
+
+    assert isinstance(data_tensor, Tensor)
+    # The data property should return a detached tensor
+    assert data_tensor.requires_grad is False
+    assert data_tensor.creator is None
+    assert data_tensor.grad_fn is None
+    # Check if the underlying numpy data is the same
+    assert np.array_equal(data_tensor._data, y._data)
+    # Ensure the original tensor is unchanged
+    assert y.requires_grad is True
+    assert y.creator is not None
+
+
+def test_tensor_detach() -> None:
+    """Test the `detach` method returns a new tensor detached from the graph."""
+    x_data = np.array([1.0, 2.0], dtype=np.float32)
+    x = torch.tensor(x_data, requires_grad=True)
+    y = torch.square(x)  # y requires grad and has a creator
+
+    assert isinstance(y, Tensor)
+
+    detached_y = y.detach()
+
+    # Check detached tensor properties
+    assert isinstance(detached_y, Tensor)
+    assert detached_y.requires_grad is False
+    assert detached_y.creator is None
+    assert detached_y.grad_fn is None
+    assert detached_y.dtype == y.dtype
+    assert np.array_equal(detached_y._data, y._data)
+
+    # Ensure the original tensor is unchanged
+    assert y.requires_grad is True
+    assert y.creator is not None
+
+    # Check that the underlying numpy data is shared (modifying detached affects original)
+    # Note: This depends on the Tensor constructor not forcing a copy.
+    # If the constructor copies, this part of the test might fail.
+    detached_y._data[0] = 99.0
+    assert y._data[0] == 99.0
+
+
+def test_tensor_detach_data_sharing() -> None:
+    """Verify if detach shares the underlying numpy array."""
+    original_data = np.array([1.0, 2.0])
+    t = torch.tensor(original_data, requires_grad=True)
+    detached_t = t.detach()
+
+    # Check if they reference the same numpy array object
+    assert detached_t._data is t._data
+
+    # Modify the detached tensor's data
+    detached_t._data[0] = 100.0
+
+    # Check if the original tensor's data is also modified
+    assert t._data[0] == 100.0
+
+    # Modify the original tensor's data
+    t._data[1] = 200.0
+
+    # Check if the detached tensor's data is also modified
+    assert detached_t._data[1] == 200.0

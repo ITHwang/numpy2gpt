@@ -26,11 +26,14 @@ from torch.types import (
     INPUT_TYPE,
     INPUT_TYPE_TUPLE,
     NUMERIC_TYPE,
-    TORCH_TYPE,
+    NUMPY_DTYPE,
+    TORCH_DTYPE,
     float32,
     float64,
     int32,
     int64,
+    type_np2torch,
+    type_torch2np,
 )
 
 # set tensor
@@ -64,9 +67,12 @@ __all__ = [
     "INPUT_TYPE",
     "INPUT_TYPE_TUPLE",
     "NUMERIC_TYPE",
-    "TORCH_TYPE",
+    "NUMPY_DTYPE",
+    "TORCH_DTYPE",
     "float32",
     "float64",
     "int32",
     "int64",
+    "type_np2torch",
+    "type_torch2np",
 ]

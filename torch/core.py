@@ -8,7 +8,7 @@ from typing import ContextManager, Generator, Literal, Sized
 import numpy as np
 from loguru import logger
 
-from torch import types
+import torch
 from torch.priority_queue import PriorityQueue
 
 
@@ -70,8 +70,8 @@ class Size:
 
 
 def tensor(
-    data: types.INPUT_TYPE | None = None,
-    dtype: types.TORCH_TYPE | None = None,
+    data: torch.INPUT_TYPE,
+    dtype: torch.TORCH_DTYPE | None = None,
     requires_grad: bool = False,
     name: str | None = None,
 ) -> Tensor:
@@ -101,8 +101,8 @@ class Tensor:
 
     def __init__(
         self,
-        data: types.INPUT_TYPE,
-        dtype: types.TORCH_TYPE | None = None,
+        data: torch.INPUT_TYPE,
+        dtype: torch.TORCH_DTYPE | None = None,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
@@ -132,25 +132,21 @@ class Tensor:
             requires_grad: Whether to require gradients for the tensor.
             name: You can give a name to the tensor. This is useful for debugging and visualization.
         """
-        if isinstance(data, np.ndarray):
-            pass
-        elif isinstance(data, types.INPUT_TYPE_TUPLE):
-            data = np.array(data)
+        if isinstance(data, torch.INPUT_TYPE_TUPLE):
+            if isinstance(data, np.ndarray):
+                pass
+            else:
+                data = np.array(data)
         else:
             raise ValueError(f"Data has an invalid type: {type(data)}")
 
         if dtype is not None:
-            match dtype:
-                case types.int32:
-                    data = data.astype(np.int32)
-                case types.int64:
-                    data = data.astype(np.int64)
-                case types.float32:
-                    data = data.astype(np.float32)
-                case types.float64:
-                    data = data.astype(np.float64)
-                case _:
-                    raise ValueError(f"Unsupported dtype: {dtype}")
+            # Convert data type using astype.
+            # copy=False ensures that we don't create a copy if the dtype
+            # already matches, which is crucial for detach() to work correctly
+            # (i.e., share the underlying numpy array).
+            data_type: torch.NUMPY_DTYPE = torch.type_torch2np(dtype)
+            data = data.astype(data_type, copy=False)
 
         if (
             requires_grad
@@ -165,7 +161,7 @@ class Tensor:
                 "Only Tensors of floating point and complex dtype can require gradients"
             )
 
-        self._data = data
+        self._data: np.ndarray = data
         self.name = name
         self.grad: np.ndarray | None = None
         self._creator: Function | None = None
@@ -189,14 +185,28 @@ class Tensor:
             return f"tensor({p}, dtype={self.dtype})"
 
     @property
-    def data(self) -> np.ndarray:
-        """TODO: This method should detach the tensor from the computational graph.
+    def data(self) -> Tensor:
+        """Detach the tensor from the computational graph.
+
+        Often used when updating parameters after backpropagation.
 
         In PyTorch, this method is implemented by `Tensor.data`.
         But This attribute is kinda legacy, and it is not recommended to use it in modern PyTorch.
         We should implement this method though.
+        Also See: https://stackoverflow.com/questions/51743214/is-data-still-useful-in-pytorch
+
+        For simplicity, we just call `detach()` here.
         """
-        raise NotImplementedError
+        return self.detach()
+
+    @data.setter
+    def data(self, input_tensor: Tensor) -> None:
+        if not isinstance(input_tensor, Tensor):
+            raise ValueError(
+                f"input_tensor must be a Tensor. Got {type(input_tensor)}."
+            )
+
+        self._data = input_tensor._data
 
     @property
     def creator(self) -> Function | None:
@@ -225,27 +235,23 @@ class Tensor:
         return self.size()
 
     @property
-    def dtype(self) -> types.TORCH_TYPE:
+    def dtype(self) -> torch.TORCH_DTYPE:
         item_: np.ndarray = self._data
 
-        match item_.dtype:
-            case np.int32:
-                return types.int32
-            case np.int64:
-                return types.int64
-            case np.float32:
-                return types.float32
-            case np.float64:
-                return types.float64
-            case _:
-                raise ValueError(f"Unsupported dtype: {item_.dtype}")
+        return torch.type_np2torch(item_.dtype)
+
+    @dtype.setter
+    def dtype(self, input_dtype: torch.TORCH_DTYPE) -> None:
+        data_type: torch.NUMPY_DTYPE = torch.type_torch2np(input_dtype)
+
+        self._data = self._data.astype(data_type, copy=False)
 
     def size(self) -> Size:
         item_: np.ndarray = self._data
 
         return Size(*item_.shape)
 
-    def item(self) -> types.NUMERIC_TYPE:
+    def item(self) -> torch.NUMERIC_TYPE:
         data_: np.ndarray = self._data
 
         if data_.size > 1:
@@ -269,6 +275,15 @@ class Tensor:
                 return float(item_)
             case _:
                 raise ValueError(f"Unsupported dtype: {type(item_)}")
+
+    def detach(self) -> Tensor:
+        """Detach the tensor from the computational graph.
+
+        Like PyTorch, this method returns a new tensor with the same underlying data but without the computational graph.
+
+        Refer: https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/TensorShape.cpp#L4504
+        """
+        return Tensor(data=self._data, dtype=self.dtype, requires_grad=False, name=None)
 
     def backward(self, retain_grad: bool = False) -> None:
         """Backward propagation.
@@ -355,7 +370,7 @@ class Tensor:
         self.grad = None
 
 
-def as_tensor(obj: types.INPUT_TYPE | Tensor) -> Tensor:
+def as_tensor(obj: torch.INPUT_TYPE | Tensor) -> Tensor:
     if isinstance(obj, Tensor):
         return obj
     return Tensor(obj)
@@ -363,7 +378,7 @@ def as_tensor(obj: types.INPUT_TYPE | Tensor) -> Tensor:
 
 class Function:
     def __call__(
-        self, *input_args: types.INPUT_TYPE | Tensor
+        self, *input_args: torch.INPUT_TYPE | Tensor
     ) -> Tensor | tuple[Tensor, ...]:
         """Do forward propagation.
         self.generation: the generation of the function.
@@ -581,63 +596,63 @@ class Cos(Function):
         return gx
 
 
-def square(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def square(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Square()(x)
 
 
-def exp(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def exp(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Exp()(x)
 
 
 def add(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Add()(x0, x1)
 
 
 def mul(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Mul()(x0, x1)
 
 
-def neg(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def neg(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Neg()(x)
 
 
 def sub(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Sub()(x0, x1)
 
 
 def rsub(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Sub()(x1, x0)
 
 
 def div(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Div()(x0, x1)
 
 
 def rdiv(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Div()(x1, x0)
 
 
-def pow(x: types.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+def pow(x: torch.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
     return Pow(c)(x)
 
 
-def sin(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def sin(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Sin()(x)
 
 
-def cos(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def cos(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Cos()(x)
 
 
