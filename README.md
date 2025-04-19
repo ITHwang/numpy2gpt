@@ -13,7 +13,7 @@
 </p>
 
 # Overview
-- An educational implementation of GPT from scratch using numpy, inspired by [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3) and [nanoGPT](https://github.com/karpathy/nanoGPT).
+- An educational implementation of GPT from scratch using numpy, heavily inspired by [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3), [nanoGPT](https://github.com/karpathy/nanoGPT), and [pytorch](https://github.com/pytorch/pytorch).
 
 # Concepts
 
@@ -62,7 +62,7 @@
       c --> Func4[Func4 @ 2]
       Func4 --> y((y @ 3))
     ```
-4. `Memory Optimization`
+4. Memory Optimization
   - As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
   - To avoid this, we use `weakref.ref` for the outputs of the function.
   - Using weakref.ref for output tensors eliminates circular references, reducing memory usage by 72% (from 136.4 MiB to 38.2 MiB) in our test([measure_memory.py](./torch/measure_memory.py)).
@@ -212,6 +212,5 @@ The library provides robust tools for visualizing computational graphs, which he
   - **Arrows**: Data flow direction between operations and tensors
 
 # References
-- [pytorch](https://github.com/pytorch/pytorch)
 - [PyTorch Pocket Reference](https://www.oreilly.com/library/view/pytorch-pocket-reference/9781492089995)
 - Paszke, Adam, et al. "Automatic differentiation ni pytorch." (2017). [link](https://openreview.net/pdf?id=BJJsrmfCZ)
