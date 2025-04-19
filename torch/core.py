@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import contextlib
+import sys
 import weakref
-from typing import ContextManager, Generator, Iterable, Sized, cast
+from typing import ContextManager, Generator, Literal, Sized
 
 import numpy as np
+from loguru import logger
 
 from torch import types
 from torch.priority_queue import PriorityQueue
+
+
+def set_logging_level(
+    level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"],
+) -> None:
+    """Set the logging level.
+
+    Args:
+        level: The logging level to set
+    """
+    logger.remove()
+    logger.add(sys.stdout, level=level)
 
 
 class Config:

@@ -13,6 +13,7 @@ from torch.core import (
     pow,
     rdiv,
     rsub,
+    set_logging_level,
     setup_tensor,
     sin,  # to be moved to functions.py
     square,  # to be moved to functions.py
@@ -32,7 +33,11 @@ from torch.types import (
     int64,
 )
 
+# set tensor
 setup_tensor()
+
+# set logging at default level(INFO)
+set_logging_level("INFO")
 
 __all__ = [
     "Config",
