@@ -95,7 +95,7 @@ def test_square_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_exp_backward() -> None:
@@ -115,7 +115,7 @@ def test_exp_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_mul_backward() -> None:
@@ -141,8 +141,8 @@ def test_mul_backward() -> None:
     assert analytical_x1_grad is not None
     assert numerical_x0_grad is not None
     assert numerical_x1_grad is not None
-    assert np.allclose(analytical_x0_grad, numerical_x0_grad)
-    assert np.allclose(analytical_x1_grad, numerical_x1_grad)
+    assert np.allclose(analytical_x0_grad._data, numerical_x0_grad)
+    assert np.allclose(analytical_x1_grad._data, numerical_x1_grad)
 
 
 def test_neg_backward() -> None:
@@ -162,7 +162,7 @@ def test_neg_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_sub_backward() -> None:
@@ -180,7 +180,7 @@ def test_sub_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_rsub_backward() -> None:
@@ -198,7 +198,7 @@ def test_rsub_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_div_backward() -> None:
@@ -219,7 +219,7 @@ def test_div_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_rdiv_backward() -> None:
@@ -239,7 +239,7 @@ def test_rdiv_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_multi_branch_backward() -> None:
@@ -282,7 +282,7 @@ def test_multi_branch_backward() -> None:
 
     assert analytical_grad is not None
     assert grad_x is not None
-    assert np.allclose(analytical_grad, grad_x)
+    assert np.allclose(analytical_grad._data, grad_x)
 
 
 def test_pow_backward() -> None:
@@ -302,7 +302,7 @@ def test_pow_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -405,7 +405,7 @@ def test_forward_with_no_grad() -> None:
     assert y.creator is not None
     assert y.creator.inputs is not None
     assert y.creator.outputs is not None
-    assert np.allclose(x.grad, 4.0)
+    assert np.allclose(x.grad._data, 4.0)
 
 
 def test_item_single_element() -> None:
@@ -583,8 +583,8 @@ def test_sphere_function_backward() -> None:
     assert dy_analytical is not None
     assert dx_numerical is not None
     assert dy_numerical is not None
-    assert np.allclose(dx_analytical, dx_numerical)
-    assert np.allclose(dy_analytical, dy_numerical)
+    assert np.allclose(dx_analytical._data, dx_numerical)
+    assert np.allclose(dy_analytical._data, dy_numerical)
 
 
 def test_goldstein_function_backward() -> None:
@@ -612,8 +612,8 @@ def test_goldstein_function_backward() -> None:
     assert dy_analytical is not None
     assert dx_numerical is not None
     assert dy_numerical is not None
-    assert np.allclose(dx_analytical, dx_numerical, rtol=1e-3, atol=1e-3)
-    assert np.allclose(dy_analytical, dy_numerical, rtol=1e-3, atol=1e-3)
+    assert np.allclose(dx_analytical._data, dx_numerical, rtol=1e-3, atol=1e-3)
+    assert np.allclose(dy_analytical._data, dy_numerical, rtol=1e-3, atol=1e-3)
 
 
 def test_matyas_function_backward() -> None:
@@ -641,8 +641,8 @@ def test_matyas_function_backward() -> None:
     assert dy_analytical is not None
     assert dx_numerical is not None
     assert dy_numerical is not None
-    assert np.allclose(dx_analytical, dx_numerical)
-    assert np.allclose(dy_analytical, dy_numerical)
+    assert np.allclose(dx_analytical._data, dx_numerical)
+    assert np.allclose(dy_analytical._data, dy_numerical)
 
 
 def test_sin_backward() -> None:
@@ -662,7 +662,7 @@ def test_sin_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_cos_backward() -> None:
@@ -682,7 +682,7 @@ def test_cos_backward() -> None:
     # Check if they're close
     assert analytical_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_tensor_data_getter() -> None:

@@ -216,7 +216,7 @@ class Tensor:
 
         self._data: np.ndarray = data
         self.name = name
-        self.grad: np.ndarray | None = None
+        self.grad: Tensor | None = None
         self._creator: Function | None = None
         self.generation: int = 0
         self.requires_grad = requires_grad
@@ -357,7 +357,7 @@ class Tensor:
             if self.requires_grad:
                 # if the gradient is not set, set it to 1.0
                 # this is because dy/dy = 1.0
-                self.grad = np.ones_like(self._data)
+                self.grad = ones_like(self, dtype=self.dtype)
             elif self._creator is None:
                 # The final output tensor of the computational graph does not require grad.
                 raise RuntimeError(
@@ -505,7 +505,7 @@ class Add(Function):
 
         return y
 
-    def backward(self, *gys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
         if len(gys) != 1:
             raise ValueError("Add must take one argument")
 
@@ -524,13 +524,13 @@ class Square(Function):
 
         return y
 
-    def backward(self, *gys: np.ndarray) -> np.ndarray:
+    def backward(self, *gys: Tensor) -> Tensor:
         if len(gys) != 1:
             raise ValueError("Square must take one argument")
 
         gy = gys[0]
-        x = self.inputs[0]._data
-        gx = 2 * x * gy
+        x = self.inputs[0]
+        gx: Tensor = 2 * x * gy  # type: ignore
 
         return gx
 
@@ -545,13 +545,13 @@ class Exp(Function):
 
         return y
 
-    def backward(self, *gys: np.ndarray) -> np.ndarray:
+    def backward(self, *gys: Tensor) -> Tensor:
         if len(gys) != 1:
             raise ValueError("Exp must take one argument")
 
         gy = gys[0]
-        x = self.inputs[0]._data
-        gx = np.exp(x) * gy
+        x = self.inputs[0]
+        gx: Tensor = exp(x) * gy  # type: ignore
 
         return gx
 
@@ -562,8 +562,8 @@ class Mul(Function):
 
         return y
 
-    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x0, x1 = self.inputs[0]._data, self.inputs[1]._data
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
         gx0 = gy * x1
         gx1 = gy * x0
 
@@ -574,15 +574,15 @@ class Neg(Function):
     def forward(self, x: np.ndarray) -> np.ndarray:
         return -x
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        return -gy
+    def backward(self, gy: Tensor) -> Tensor:
+        return -gy  # type: ignore
 
 
 class Sub(Function):
     def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
         return x0 - x1
 
-    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
         return gy, -gy
 
 
@@ -603,9 +603,8 @@ class Div(Function):
     def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
         return x0 / x1
 
-    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x0: np.ndarray = self.inputs[0]._data
-        x1: np.ndarray = self.inputs[1]._data
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
 
         gx0 = gy / x1
         gx1 = -gy * x0 / x1**2
@@ -620,9 +619,9 @@ class Pow(Function):
     def forward(self, x: np.ndarray) -> np.ndarray:
         return x**self.c
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0]._data
-        gx = self.c * x ** (self.c - 1) * gy
+    def backward(self, gy: Tensor) -> Tensor:
+        x = self.inputs[0]
+        gx: Tensor = self.c * x ** (self.c - 1) * gy  # type: ignore
 
         return gx
 
@@ -631,9 +630,9 @@ class Sin(Function):
     def forward(self, x: np.ndarray) -> np.ndarray:
         return np.sin(x)
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0]._data
-        gx = gy * np.cos(x)
+    def backward(self, gy: Tensor) -> Tensor:
+        x = self.inputs[0]
+        gx: Tensor = gy * cos(x)  # type: ignore
 
         return gx
 
@@ -642,9 +641,9 @@ class Cos(Function):
     def forward(self, x: np.ndarray) -> np.ndarray:
         return np.cos(x)
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0]._data
-        gx = -gy * np.sin(x)
+    def backward(self, gy: Tensor) -> Tensor:
+        x = self.inputs[0]
+        gx: Tensor = -gy * sin(x)  # type: ignore
 
         return gx
 
