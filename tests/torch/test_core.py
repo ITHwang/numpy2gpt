@@ -796,3 +796,78 @@ def test_ones() -> None:
     assert np.array_equal(t4._data, np.ones(5, dtype=t4._data.dtype))
     assert t4.requires_grad is False
     assert t4.name == "test_ones_tensor"
+
+
+def test_ones_like() -> None:
+    """Test the `ones_like` function."""
+    # Input tensor with float dtype
+    input1 = torch.tensor(
+        np.array([[1.0, 2.0], [3.0, 4.0]]), dtype=torch.float32, requires_grad=True
+    )
+
+    # Basic test: inherit shape, dtype, requires_grad
+    t1 = torch.ones_like(input1)
+    assert isinstance(t1, Tensor)
+    assert t1.shape == input1.shape
+    assert t1.dtype == input1.dtype
+    # ones_like should default requires_grad to False unless overridden
+    assert t1.requires_grad is False
+    assert np.array_equal(t1._data, np.ones_like(input1._data))
+
+    # Test overriding dtype (to int)
+    t2 = torch.ones_like(input1, dtype=torch.int64)
+    assert isinstance(t2, Tensor)
+    assert t2.shape == input1.shape
+    assert t2.dtype == torch.int64
+    assert t2.requires_grad is False
+    assert np.array_equal(t2._data, np.ones_like(input1._data, dtype=np.int64))
+
+    # Test overriding requires_grad
+    t3 = torch.ones_like(input1, requires_grad=True)
+    assert isinstance(t3, Tensor)
+    assert t3.shape == input1.shape
+    assert t3.dtype == input1.dtype
+    assert t3.requires_grad is True
+    assert np.array_equal(t3._data, np.ones_like(input1._data))
+
+    # Test overriding dtype and requires_grad
+    t4 = torch.ones_like(input1, dtype=torch.float64, requires_grad=True)
+    assert isinstance(t4, Tensor)
+    assert t4.shape == input1.shape
+    assert t4.dtype == torch.float64
+    assert t4.requires_grad is True
+    assert np.array_equal(t4._data, np.ones_like(input1._data, dtype=np.float64))
+
+    # Test with name
+    t5 = torch.ones_like(input1, name="test_ones_like")
+    assert isinstance(t5, Tensor)
+    assert t5.shape == input1.shape
+    assert t5.dtype == input1.dtype
+    assert t5.requires_grad is False
+    assert t5.name == "test_ones_like"
+    assert np.array_equal(t5._data, np.ones_like(input1._data))
+
+    # Test with non-tensor input -> raises ValueError
+    with pytest.raises(ValueError):
+        torch.ones_like(np.array([1, 2, 3]))
+
+    # Test with integer input tensor
+    input_int = torch.tensor([5, 6], dtype=torch.int32)
+    t6 = torch.ones_like(input_int)
+    assert isinstance(t6, Tensor)
+    assert t6.shape == input_int.shape
+    assert t6.dtype == input_int.dtype
+    assert t6.requires_grad is False  # Cannot require grad for int
+    assert np.array_equal(t6._data, np.ones_like(input_int._data))
+
+    # Test overriding requires_grad on int input (should fail if dtype not float)
+    with pytest.raises(RuntimeError):
+        torch.ones_like(input_int, requires_grad=True)
+
+    # Test overriding requires_grad on int input with float dtype (should work)
+    t7 = torch.ones_like(input_int, dtype=torch.float32, requires_grad=True)
+    assert isinstance(t7, Tensor)
+    assert t7.shape == input_int.shape
+    assert t7.dtype == torch.float32
+    assert t7.requires_grad is True
+    assert np.array_equal(t7._data, np.ones_like(input_int._data, dtype=np.float32))

@@ -12,6 +12,7 @@ from torch.core import (
     neg,
     no_grad,
     ones,
+    ones_like,
     pow,
     rdiv,
     rsub,
@@ -79,4 +80,5 @@ __all__ = [
     "type_np2torch",
     "type_torch2np",
     "ones",
+    "ones_like",
 ]

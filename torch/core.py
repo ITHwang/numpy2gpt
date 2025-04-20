@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import sys
 import weakref
-from typing import ContextManager, Generator, Literal, Sized
+from typing import ContextManager, Generator, Iterator, Literal, Sized
 
 import numpy as np
 from loguru import logger
@@ -70,6 +70,10 @@ class Size:
             return False
         return self.args == other.args
 
+    def __iter__(self) -> Iterator[int]:
+        """Return an iterator over the dimensions."""
+        return iter(self.args)
+
     def __repr__(self) -> str:
         return f"torch.Size([{', '.join(str(arg) for arg in self.args)}])"
 
@@ -106,6 +110,31 @@ def ones(
         name: The name of the tensor.
     """
     return Tensor(np.ones(size), dtype, requires_grad, name)
+
+
+def ones_like(
+    input: Tensor,
+    *,
+    dtype: torch.TORCH_DTYPE | None = None,
+    requires_grad: bool = False,
+    name: str | None = None,
+) -> Tensor:
+    """Create a tensor with all elements set to 1.
+
+    https://pytorch.org/docs/stable/generated/torch.ones_like.html
+
+    Args:
+        input: The input tensor.
+    """
+    if not isinstance(input, Tensor):
+        raise ValueError(f"Input must be a Tensor. Got {type(input)}.")
+
+    return ones(
+        *input.size(),
+        dtype=dtype if dtype else input.dtype,
+        requires_grad=requires_grad,
+        name=name,
+    )
 
 
 class Tensor:
