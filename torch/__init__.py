@@ -1,6 +1,7 @@
 from torch.core import (
     Config,
     Function,
+    Size,
     Tensor,
     add,
     as_tensor,
@@ -10,6 +11,7 @@ from torch.core import (
     mul,
     neg,
     no_grad,
+    ones,
     pow,
     rdiv,
     rsub,
@@ -46,6 +48,7 @@ __all__ = [
     "Config",
     "Function",
     "Tensor",
+    "Size",
     "add",
     "as_tensor",
     "div",
@@ -75,4 +78,5 @@ __all__ = [
     "int64",
     "type_np2torch",
     "type_torch2np",
+    "ones",
 ]

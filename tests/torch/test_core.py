@@ -756,3 +756,43 @@ def test_tensor_detach_data_sharing() -> None:
 
     # Check if the detached tensor's data is also modified
     assert detached_t._data[1] == 200.0
+
+
+def test_ones() -> None:
+    """Test the `ones` function for creating tensors."""
+    # Test basic creation
+    t1 = torch.ones(2, 3)
+    assert isinstance(t1, Tensor)
+    assert t1.shape == torch.Size(2, 3)
+    # Default dtype might vary, but check it's a float type if no dtype specified
+    assert t1.dtype in (torch.float32, torch.float64)
+    assert np.array_equal(t1._data, np.ones((2, 3), dtype=t1._data.dtype))
+    assert t1.requires_grad is False
+
+    # Test with specified dtype (integer)
+    t2 = torch.ones(4, dtype=torch.int32)
+    assert isinstance(t2, Tensor)
+    assert t2.shape == torch.Size(
+        4,
+    )
+    assert t2.dtype == torch.int32
+    assert np.array_equal(t2._data, np.ones(4, dtype=np.int32))
+    assert t2.requires_grad is False
+
+    # Test with specified dtype (float) and requires_grad
+    t3 = torch.ones(1, 2, dtype=torch.float32, requires_grad=True)
+    assert isinstance(t3, Tensor)
+    assert t3.shape == torch.Size(1, 2)
+    assert t3.dtype == torch.float32
+    assert np.array_equal(t3._data, np.ones((1, 2), dtype=np.float32))
+    assert t3.requires_grad is True
+
+    # Test with name
+    t4 = torch.ones(5, name="test_ones_tensor")
+    assert isinstance(t4, Tensor)
+    assert t4.shape == torch.Size(
+        5,
+    )
+    assert np.array_equal(t4._data, np.ones(5, dtype=t4._data.dtype))
+    assert t4.requires_grad is False
+    assert t4.name == "test_ones_tensor"

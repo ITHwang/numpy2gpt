@@ -65,6 +65,11 @@ class Size:
     def __getitem__(self, index: int) -> int:
         return self.args[index]
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Size):
+            return False
+        return self.args == other.args
+
     def __repr__(self) -> str:
         return f"torch.Size([{', '.join(str(arg) for arg in self.args)}])"
 
@@ -82,6 +87,25 @@ def tensor(
         https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/python_torch_functions_manual.cpp#L243-L267
     """
     return Tensor(data, dtype, requires_grad, name)
+
+
+def ones(
+    *size: int,
+    dtype: torch.TORCH_DTYPE | None = None,
+    requires_grad: bool = False,
+    name: str | None = None,
+) -> Tensor:
+    """Create a tensor with all elements set to 1.
+
+    https://pytorch.org/docs/stable/generated/torch.ones.html
+
+    Args:
+        size: The size of the tensor.
+        dtype: The dtype of the tensor.
+        requires_grad: Whether to require gradients for the tensor.
+        name: The name of the tensor.
+    """
+    return Tensor(np.ones(size), dtype, requires_grad, name)
 
 
 class Tensor:
