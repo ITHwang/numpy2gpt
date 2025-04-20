@@ -306,14 +306,14 @@ def test_pow_backward() -> None:
 
 
 @pytest.mark.parametrize(  # type: ignore
-    "retain_grad",
+    "retain_graph",
     [True, False],
 )
-def test_retain_grad(retain_grad: bool) -> None:
-    """Test the retain_grad argument of the backward method.
+def test_retain_graph(retain_graph: bool) -> None:
+    """Test the retain_graph argument of the backward method.
 
-    If retain_grad is True, the gradient of the tensor is not None.
-    If retain_grad is False, the gradient of the tensor is None.
+    If retain_graph is True, the gradient of the tensor is not None.
+    If retain_graph is False, the gradient of the tensor is None.
     """
     x0 = torch.tensor(np.array(1.0), requires_grad=True)
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
@@ -324,9 +324,9 @@ def test_retain_grad(retain_grad: bool) -> None:
     y = torch.square(t)
     assert isinstance(y, Tensor)
 
-    y.backward(retain_grad=retain_grad)
+    y.backward(retain_graph=retain_graph)
 
-    if retain_grad:
+    if retain_graph:
         assert t.grad is not None
         assert y.grad is not None
     else:

@@ -338,7 +338,9 @@ class Tensor:
         """
         return Tensor(data=self._data, dtype=self.dtype, requires_grad=False, name=None)
 
-    def backward(self, retain_grad: bool = False) -> None:
+    def backward(
+        self, retain_graph: bool | None = None, create_graph: bool = False
+    ) -> None:
         """Backward propagation.
 
         Traverses the computational graph backwards:
@@ -347,12 +349,22 @@ class Tensor:
         - Propagates gradients to input tensors
         - Continues recursively through the entire graph
 
+        See: https://pytorch.org/docs/stable/generated/torch.Tensor.backward.html#torch-tensor-backward
+
         Args:
-            retain_grad: Whether to keep the gradients of the output tensors
+            retain_graph: Whether to keep the computational graph of the output tensors
                 In most cases, we don't need to keep the gradients in the middle of the backpropagation.
                 We finally use only the gradient of the "first" input tensor.(dy/dx)
-                So, we set it to False by default.
+                Defaults to the value of `create_graph`.
+            create_graph: Whether to create a new graph for the backward pass.
+                If True, the backward pass will create a new computational graph for the gradient.
+                This is useful for computing higher-order derivatives.
+                Defaults to False.
+                See: https://pytorch.org/docs/stable/autograd.html#default-gradient-layouts
         """
+        if retain_graph is None:
+            retain_graph = create_graph
+
         if self.grad is None:
             if self.requires_grad:
                 # if the gradient is not set, set it to 1.0
@@ -396,25 +408,27 @@ class Tensor:
             # get gradients of outputs
             # NOTE: f.outputs is a tuple of weakref.ref[Tensor]
             gys = [output().grad for output in f.outputs]  # type: ignore
-            gxs = f.backward(*gys)
-            if not isinstance(gxs, tuple):
-                gxs = (gxs,)
 
-            # set gradients of inputs
-            for x, gx in zip(f.inputs, gxs):
-                # if the grad is set in the loop, accumulate it.
-                if x.grad is None:
-                    x.grad = gx
-                else:
-                    # DO NOT use +=, it is in-place operation(numpy) causing side effects.
-                    x.grad = x.grad + gx
+            with using_config("enable_backprop", create_graph):
+                gxs = f.backward(*gys)
+                if not isinstance(gxs, tuple):
+                    gxs = (gxs,)
 
-                # If the input has a creator, it means that the input is an output of another function.
-                # So, we need to add the creator to the list of functions to get another gradient.
-                if x.creator is not None:
-                    add_func(x.creator)
+                # set gradients of inputs
+                for x, gx in zip(f.inputs, gxs):
+                    # if the grad is set in the loop, accumulate it.
+                    if x.grad is None:
+                        x.grad = gx
+                    else:
+                        # DO NOT use `+=` which is an in-place operation of numpy causing side effects.
+                        x.grad = x.grad + gx
 
-            if not retain_grad:
+                    # If the input has a creator, it means that the input is an output of another function.
+                    # So, we need to add the creator to the list of functions to get another gradient.
+                    if x.creator is not None:
+                        add_func(x.creator)
+
+            if not retain_graph:
                 for output in f.outputs:
                     # NOTE: output is a weakref.ref[Tensor]
                     output().grad = None  # type: ignore

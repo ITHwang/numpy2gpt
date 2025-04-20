@@ -149,6 +149,9 @@ print(x.grad)  # Access gradients
 - **Gradient Accumulation**: Support for complex computational graphs
 - **Memory Optimization**: Uses weak references to avoid circular reference memory leaks
 
+### 1.4. In-place Operations
+- TBD
+
 ## 2. Neural Network Visualization
 
 The library provides robust tools for visualizing computational graphs, which helps understand the flow of tensors through operations:
