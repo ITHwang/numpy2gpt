@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Callable
 
 import numpy as np
 import pytest
@@ -7,48 +6,7 @@ import pytest
 import torch
 from torch import Tensor
 
-from .complex_funcs import goldstein, matyas, sphere
-
-
-def numerical_diff(
-    f: Callable[
-        [torch.INPUT_TYPE | torch.Tensor],
-        torch.Tensor | tuple[torch.Tensor, ...],
-    ],
-    x: torch.Tensor,
-    eps: float = 1e-4,
-) -> float:
-    """Calculate the numerical gradient of a function.
-
-    The central difference is more accurate than the forward difference.
-    See: http://www.ohiouniversityfaculty.com/youngt/IntNumMeth/lecture27.pdf
-
-    Args:
-        f: A function that takes a Tensor and returns a Tensor.
-        x: The input Tensor.
-        eps: The epsilon value for numerical differentiation.
-    """
-    x_data: np.ndarray = x._data
-    x0 = torch.tensor(x_data - eps)
-    x1 = torch.tensor(x_data + eps)
-    y0 = f(x0)
-    y1 = f(x1)
-
-    assert isinstance(y0, torch.Tensor), (
-        "The case that the output is a tuple of Tensors is not considered yet. "
-        "If you met the case, please implement."
-    )
-    assert isinstance(y1, torch.Tensor), (
-        "The case that the output is a tuple of Tensors is not considered yet. "
-        "If you met the case, please implement."
-    )
-
-    numerator = y1._data - y0._data
-    if isinstance(numerator, np.ndarray) and numerator.size == 1:
-        numerator = float(numerator[0])
-    denominator = 2 * eps
-
-    return float(numerator / denominator)
+from .utils import numerical_diff
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -76,46 +34,6 @@ def test_tensor_init_with_invalid_type() -> None:
     """If the input is not numeric or array, it raises an error."""
     with pytest.raises(ValueError):
         t = torch.tensor("invalid")
-
-
-def test_square_backward() -> None:
-    """Test the backward propagation of the square function."""
-    x = torch.tensor(np.array(2.0), requires_grad=True)
-    y = torch.square(x)
-    assert isinstance(y, torch.Tensor)
-
-    y.backward()
-
-    # Analytical gradient
-    analytical_grad = x.grad
-
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.square, x)
-
-    # Check if they're close
-    assert analytical_grad is not None
-    assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
-
-
-def test_exp_backward() -> None:
-    """Test the backward propagation of the exp function."""
-    x = torch.tensor(np.array(1.0), requires_grad=True)
-    y = torch.exp(x)
-    assert isinstance(y, torch.Tensor)
-
-    y.backward()
-
-    # Analytical gradient
-    analytical_grad = x.grad
-
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.exp, x)
-
-    # Check if they're close
-    assert analytical_grad is not None
-    assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_mul_backward() -> None:
@@ -556,133 +474,6 @@ def test_backward_without_requires_grad() -> None:
         "element 0 of tensors does not require grad and does not have a grad_fn"
         in str(excinfo.value)
     )
-
-
-def test_sphere_function_backward() -> None:
-    """Test gradients of the sphere function using numerical differentiation."""
-    # Create input tensors
-    x = torch.tensor([2.0], requires_grad=True)
-    y = torch.tensor([3.0], requires_grad=True)
-
-    # Forward pass
-    z = sphere(x, y)
-
-    # Backward pass (analytical gradient)
-    z.backward()
-
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
-
-    # Calculate numerical gradients
-    dx_numerical = numerical_diff(lambda x: sphere(x, y), x)
-    dy_numerical = numerical_diff(lambda y: sphere(x, y), y)
-
-    # Check if they match
-    assert dx_analytical is not None
-    assert dy_analytical is not None
-    assert dx_numerical is not None
-    assert dy_numerical is not None
-    assert np.allclose(dx_analytical._data, dx_numerical)
-    assert np.allclose(dy_analytical._data, dy_numerical)
-
-
-def test_goldstein_function_backward() -> None:
-    """Test gradients of the Goldstein-Price function using numerical differentiation."""
-    # Create input tensors
-    x = torch.tensor([-0.5], requires_grad=True)
-    y = torch.tensor([0.5], requires_grad=True)
-
-    # Forward pass
-    z = goldstein(x, y)
-
-    # Backward pass (analytical gradient)
-    z.backward()
-
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
-
-    # Calculate numerical gradients
-    dx_numerical = numerical_diff(lambda x: goldstein(x, y), x)
-    dy_numerical = numerical_diff(lambda y: goldstein(x, y), y)
-
-    # Check if they match
-    assert dx_analytical is not None
-    assert dy_analytical is not None
-    assert dx_numerical is not None
-    assert dy_numerical is not None
-    assert np.allclose(dx_analytical._data, dx_numerical, rtol=1e-3, atol=1e-3)
-    assert np.allclose(dy_analytical._data, dy_numerical, rtol=1e-3, atol=1e-3)
-
-
-def test_matyas_function_backward() -> None:
-    """Test gradients of the Matyas function using numerical differentiation."""
-    # Create input tensors
-    x = torch.tensor([1.5], requires_grad=True)
-    y = torch.tensor([2.0], requires_grad=True)
-
-    # Forward pass
-    z = matyas(x, y)
-
-    # Backward pass (analytical gradient)
-    z.backward()
-
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
-
-    # Calculate numerical gradients
-    dx_numerical = numerical_diff(lambda x: matyas(x, y), x)
-    dy_numerical = numerical_diff(lambda y: matyas(x, y), y)
-
-    # Check if they match
-    assert dx_analytical is not None
-    assert dy_analytical is not None
-    assert dx_numerical is not None
-    assert dy_numerical is not None
-    assert np.allclose(dx_analytical._data, dx_numerical)
-    assert np.allclose(dy_analytical._data, dy_numerical)
-
-
-def test_sin_backward() -> None:
-    """Test the backward propagation of the sin function."""
-    x = torch.tensor(np.array(1.0), requires_grad=True)
-    y = torch.sin(x)
-    assert isinstance(y, torch.Tensor)
-
-    y.backward()
-
-    # Analytical gradient
-    analytical_grad = x.grad
-
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.sin, x)
-
-    # Check if they're close
-    assert analytical_grad is not None
-    assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
-
-
-def test_cos_backward() -> None:
-    """Test the backward propagation of the cos function."""
-    x = torch.tensor(np.array(1.0), requires_grad=True)
-    y = torch.cos(x)
-    assert isinstance(y, torch.Tensor)
-
-    y.backward()
-
-    # Analytical gradient
-    analytical_grad = x.grad
-
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.cos, x)
-
-    # Check if they're close
-    assert analytical_grad is not None
-    assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_tensor_data_getter() -> None:

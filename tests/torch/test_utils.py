@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 from torch.utils import get_dot_graph, plot_dot_graph
 
-from .complex_funcs import goldstein
+from .utils import goldstein
 
 
 def test_get_dot_graph() -> None:
