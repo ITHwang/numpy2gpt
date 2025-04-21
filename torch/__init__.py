@@ -5,9 +5,7 @@ from torch.core import (
     Tensor,
     add,
     as_tensor,
-    cos,  # to be moved to functions.py
     div,
-    exp,  # to be moved to functions.py
     mul,
     neg,
     no_grad,
@@ -18,11 +16,15 @@ from torch.core import (
     rsub,
     set_logging_level,
     setup_tensor,
-    sin,  # to be moved to functions.py
-    square,  # to be moved to functions.py
     sub,
     tensor,
     using_config,
+)
+from torch.functions import (
+    cos,
+    exp,
+    sin,
+    square,
 )
 from torch.types import (
     ARRAY_TYPE,
