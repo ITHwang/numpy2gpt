@@ -21,9 +21,10 @@ if __name__ == "__main__":
 
         y = rosenbrock(x0, x1)
 
-        x0.cleargrad()
-        x1.cleargrad()
+        x0.grad = None
+        x1.grad = None
         y.backward()
 
-        x0.data -= lr * x0.grad  # type: ignore
-        x1.data -= lr * x1.grad  # type: ignore
+        with torch.no_grad():
+            x0 -= lr * x0.grad  # type: ignore
+            x1 -= lr * x1.grad  # type: ignore
