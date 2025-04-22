@@ -1,73 +1,16 @@
 from __future__ import annotations
 
 import contextlib
+import copy
+import sys
 import weakref
-from typing import ContextManager, Generator, Iterable, Sized, cast
+from typing import ContextManager, Generator, Iterator, Literal, Sized
 
 import numpy as np
+from loguru import logger
 
-from torch import types
+import torch
 from torch.priority_queue import PriorityQueue
-
-
-class Config:
-    """Config for toggling backpropagation.
-
-    When we only inference, we don't need to backpropagate gradients.
-    So, we can save memory by disabling backpropagation and removing the data used in backpropagation.
-    """
-
-    enable_backprop: bool = True
-
-
-@contextlib.contextmanager
-def using_config(name: str, value: bool) -> Generator[None, None, None]:
-    """Context manager to set a config value temporarily.
-
-    Args:
-        name: The name of the config to set
-        value: The value to set the config to
-    """
-    old_value = getattr(Config, name)
-    setattr(Config, name, value)
-    try:
-        yield
-    finally:
-        setattr(Config, name, old_value)
-
-
-def no_grad() -> ContextManager[None]:
-    """Context manager to disable gradient calculation."""
-    return using_config("enable_backprop", False)
-
-
-class Size:
-    def __init__(self, *args: int) -> None:
-        self.args = args
-
-    def __len__(self) -> int:
-        return len(self.args)
-
-    def __getitem__(self, index: int) -> int:
-        return self.args[index]
-
-    def __repr__(self) -> str:
-        return f"torch.Size([{', '.join(str(arg) for arg in self.args)}])"
-
-
-def tensor(
-    data: types.INPUT_TYPE | None = None,
-    dtype: types.TORCH_TYPE | None = None,
-    requires_grad: bool = False,
-    name: str | None = None,
-) -> Tensor:
-    """An imitation of torch.tensor in PyTorch
-
-    Originally, torch.tensor is written in C++.
-    Python binding code:
-        https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/python_torch_functions_manual.cpp#L243-L267
-    """
-    return Tensor(data, dtype, requires_grad, name)
 
 
 class Tensor:
@@ -87,8 +30,8 @@ class Tensor:
 
     def __init__(
         self,
-        data: types.INPUT_TYPE,
-        dtype: types.TORCH_TYPE | None = None,
+        data: torch.INPUT_TYPE,
+        dtype: torch.TORCH_DTYPE | None = None,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
@@ -118,25 +61,21 @@ class Tensor:
             requires_grad: Whether to require gradients for the tensor.
             name: You can give a name to the tensor. This is useful for debugging and visualization.
         """
-        if isinstance(data, np.ndarray):
-            pass
-        elif isinstance(data, types.INPUT_TYPE_TUPLE):
-            data = np.array(data)
+        if isinstance(data, torch.INPUT_TYPE_TUPLE):
+            if isinstance(data, np.ndarray):
+                pass
+            else:
+                data = np.array(data)
         else:
             raise ValueError(f"Data has an invalid type: {type(data)}")
 
         if dtype is not None:
-            match dtype:
-                case types.int32:
-                    data = data.astype(np.int32)
-                case types.int64:
-                    data = data.astype(np.int64)
-                case types.float32:
-                    data = data.astype(np.float32)
-                case types.float64:
-                    data = data.astype(np.float64)
-                case _:
-                    raise ValueError(f"Unsupported dtype: {dtype}")
+            # Convert data type using astype.
+            # copy=False ensures that we don't create a copy if the dtype
+            # already matches, which is crucial for detach() to work correctly
+            # (i.e., share the underlying numpy array).
+            data_type: torch.NUMPY_DTYPE = torch.type_torch2np(dtype)
+            data = data.astype(data_type, copy=False)
 
         if (
             requires_grad
@@ -151,9 +90,9 @@ class Tensor:
                 "Only Tensors of floating point and complex dtype can require gradients"
             )
 
-        self._data = data
+        self._data: np.ndarray = data
         self.name = name
-        self.grad: np.ndarray | None = None
+        self.grad: Tensor | None = None
         self._creator: Function | None = None
         self.generation: int = 0
         self.requires_grad = requires_grad
@@ -175,14 +114,28 @@ class Tensor:
             return f"tensor({p}, dtype={self.dtype})"
 
     @property
-    def data(self) -> np.ndarray:
-        """TODO: This method should detach the tensor from the computational graph.
+    def data(self) -> Tensor:
+        """Detach the tensor from the computational graph.
+
+        Often used when updating parameters after backpropagation.
 
         In PyTorch, this method is implemented by `Tensor.data`.
         But This attribute is kinda legacy, and it is not recommended to use it in modern PyTorch.
         We should implement this method though.
+        Also See: https://stackoverflow.com/questions/51743214/is-data-still-useful-in-pytorch
+
+        For simplicity, we just call `detach()` here.
         """
-        raise NotImplementedError
+        return self.detach()
+
+    @data.setter
+    def data(self, input_tensor: Tensor) -> None:
+        if not isinstance(input_tensor, Tensor):
+            raise ValueError(
+                f"input_tensor must be a Tensor. Got {type(input_tensor)}."
+            )
+
+        self._data = input_tensor._data
 
     @property
     def creator(self) -> Function | None:
@@ -211,27 +164,23 @@ class Tensor:
         return self.size()
 
     @property
-    def dtype(self) -> types.TORCH_TYPE:
+    def dtype(self) -> torch.TORCH_DTYPE:
         item_: np.ndarray = self._data
 
-        match item_.dtype:
-            case np.int32:
-                return types.int32
-            case np.int64:
-                return types.int64
-            case np.float32:
-                return types.float32
-            case np.float64:
-                return types.float64
-            case _:
-                raise ValueError(f"Unsupported dtype: {item_.dtype}")
+        return torch.type_np2torch(item_.dtype)
+
+    @dtype.setter
+    def dtype(self, input_dtype: torch.TORCH_DTYPE) -> None:
+        data_type: torch.NUMPY_DTYPE = torch.type_torch2np(input_dtype)
+
+        self._data = self._data.astype(data_type, copy=False)
 
     def size(self) -> Size:
         item_: np.ndarray = self._data
 
         return Size(*item_.shape)
 
-    def item(self) -> types.NUMERIC_TYPE:
+    def item(self) -> torch.NUMERIC_TYPE:
         data_: np.ndarray = self._data
 
         if data_.size > 1:
@@ -256,7 +205,35 @@ class Tensor:
             case _:
                 raise ValueError(f"Unsupported dtype: {type(item_)}")
 
-    def backward(self, retain_grad: bool = False) -> None:
+    def detach(self) -> Tensor:
+        """Detach the tensor from the computational graph.
+
+        Like PyTorch, this method returns a new tensor with the same underlying data but without the computational graph.
+
+        Refer: https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/TensorShape.cpp#L4504
+        """
+        return Tensor(data=self._data, dtype=self.dtype, requires_grad=False, name=None)
+
+    def numpy(self, force: bool = False) -> np.ndarray:
+        """Convert the tensor to a numpy array.
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.numpy.html
+
+        Args:
+            force: Whether to force the conversion.
+                If True, The ndarray may be a copy of the tensor instead of always sharing memory.
+                If False, The returned ndarray and the tensor will share their storage.
+                Defaults to False.
+        """
+
+        if force:
+            return copy.deepcopy(self._data)
+        else:
+            return self._data
+
+    def backward(
+        self, retain_graph: bool | None = None, create_graph: bool = False
+    ) -> None:
         """Backward propagation.
 
         Traverses the computational graph backwards:
@@ -265,17 +242,27 @@ class Tensor:
         - Propagates gradients to input tensors
         - Continues recursively through the entire graph
 
+        See: https://pytorch.org/docs/stable/generated/torch.Tensor.backward.html#torch-tensor-backward
+
         Args:
-            retain_grad: Whether to keep the gradients of the output tensors
+            retain_graph: Whether to keep the computational graph of the output tensors
                 In most cases, we don't need to keep the gradients in the middle of the backpropagation.
                 We finally use only the gradient of the "first" input tensor.(dy/dx)
-                So, we set it to False by default.
+                Defaults to the value of `create_graph`.
+            create_graph: Whether to create a new graph for the backward pass.
+                If True, the backward pass will create a new computational graph for the gradient.
+                This is useful for computing higher-order derivatives.
+                Defaults to False.
+                See: https://pytorch.org/docs/stable/autograd.html#default-gradient-layouts
         """
+        if retain_graph is None:
+            retain_graph = create_graph
+
         if self.grad is None:
             if self.requires_grad:
                 # if the gradient is not set, set it to 1.0
                 # this is because dy/dy = 1.0
-                self.grad = np.ones_like(self._data)
+                self.grad = ones_like(self, dtype=self.dtype)
             elif self._creator is None:
                 # The final output tensor of the computational graph does not require grad.
                 raise RuntimeError(
@@ -314,42 +301,70 @@ class Tensor:
             # get gradients of outputs
             # NOTE: f.outputs is a tuple of weakref.ref[Tensor]
             gys = [output().grad for output in f.outputs]  # type: ignore
-            gxs = f.backward(*gys)
-            if not isinstance(gxs, tuple):
-                gxs = (gxs,)
 
-            # set gradients of inputs
-            for x, gx in zip(f.inputs, gxs):
-                # if the grad is set in the loop, accumulate it.
-                if x.grad is None:
-                    x.grad = gx
-                else:
-                    # DO NOT use +=, it is in-place operation(numpy) causing side effects.
-                    x.grad = x.grad + gx
+            # NOTE: f.backward(*gys) calls Function.__call__() which refers to the value of `enable_backprop`.
+            # That's why we need to set the value of `enable_backprop` here.
+            with using_config("enable_backprop", create_graph):
+                gxs = f.backward(*gys)
+                if not isinstance(gxs, tuple):
+                    gxs = (gxs,)
 
-                # If the input has a creator, it means that the input is an output of another function.
-                # So, we need to add the creator to the list of functions to get another gradient.
-                if x.creator is not None:
-                    add_func(x.creator)
+                # set gradients of inputs
+                for x, gx in zip(f.inputs, gxs):
+                    # if the grad is set in the loop, accumulate it.
+                    if x.grad is None:
+                        x.grad = gx
+                    else:
+                        # DO NOT use `+=` which is an in-place operation of numpy causing side effects.
+                        x.grad = x.grad + gx
 
-            if not retain_grad:
+                    # If the input has a creator, it means that the input is an output of another function.
+                    # So, we need to add the creator to the list of functions to get another gradient.
+                    if x.creator is not None:
+                        add_func(x.creator)
+
+            if not retain_graph:
                 for output in f.outputs:
                     # NOTE: output is a weakref.ref[Tensor]
                     output().grad = None  # type: ignore
 
-    def cleargrad(self) -> None:
-        self.grad = None
+
+class Config:
+    """Config for toggling backpropagation.
+
+    When we only inference, we don't need to backpropagate gradients.
+    So, we can save memory by disabling backpropagation and removing the data used in backpropagation.
+    """
+
+    enable_backprop: bool = True
 
 
-def as_tensor(obj: types.INPUT_TYPE | Tensor) -> Tensor:
-    if isinstance(obj, Tensor):
-        return obj
-    return Tensor(obj)
+class Size:
+    def __init__(self, *args: int) -> None:
+        self.args = args
+
+    def __len__(self) -> int:
+        return len(self.args)
+
+    def __getitem__(self, index: int) -> int:
+        return self.args[index]
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Size):
+            return False
+        return self.args == other.args
+
+    def __iter__(self) -> Iterator[int]:
+        """Return an iterator over the dimensions."""
+        return iter(self.args)
+
+    def __repr__(self) -> str:
+        return f"torch.Size([{', '.join(str(arg) for arg in self.args)}])"
 
 
 class Function:
     def __call__(
-        self, *input_args: types.INPUT_TYPE | Tensor
+        self, *input_args: torch.INPUT_TYPE | Tensor
     ) -> Tensor | tuple[Tensor, ...]:
         """Do forward propagation.
         self.generation: the generation of the function.
@@ -423,7 +438,7 @@ class Add(Function):
 
         return y
 
-    def backward(self, *gys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
         if len(gys) != 1:
             raise ValueError("Add must take one argument")
 
@@ -432,56 +447,14 @@ class Add(Function):
         return gy, gy
 
 
-class Square(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
-        if len(xs) != 1:
-            raise ValueError("Square must take one argument")
-
-        x = xs[0]
-        y = x**2
-
-        return y
-
-    def backward(self, *gys: np.ndarray) -> np.ndarray:
-        if len(gys) != 1:
-            raise ValueError("Square must take one argument")
-
-        gy = gys[0]
-        x = self.inputs[0]._data
-        gx = 2 * x * gy
-
-        return gx
-
-
-class Exp(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
-        if len(xs) != 1:
-            raise ValueError("Exp must take one argument")
-
-        x = xs[0]
-        y = np.exp(x)
-
-        return y
-
-    def backward(self, *gys: np.ndarray) -> np.ndarray:
-        if len(gys) != 1:
-            raise ValueError("Exp must take one argument")
-
-        gy = gys[0]
-        x = self.inputs[0]._data
-        gx = np.exp(x) * gy
-
-        return gx
-
-
 class Mul(Function):
     def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
         y = x0 * x1
 
         return y
 
-    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x0, x1 = self.inputs[0]._data, self.inputs[1]._data
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
         gx0 = gy * x1
         gx1 = gy * x0
 
@@ -492,15 +465,15 @@ class Neg(Function):
     def forward(self, x: np.ndarray) -> np.ndarray:
         return -x
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        return -gy
+    def backward(self, gy: Tensor) -> Tensor:
+        return -gy  # type: ignore
 
 
 class Sub(Function):
     def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
         return x0 - x1
 
-    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
         return gy, -gy
 
 
@@ -521,9 +494,8 @@ class Div(Function):
     def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
         return x0 / x1
 
-    def backward(self, gy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        x0: np.ndarray = self.inputs[0]._data
-        x1: np.ndarray = self.inputs[1]._data
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
 
         gx0 = gy / x1
         gx1 = -gy * x0 / x1**2
@@ -538,93 +510,67 @@ class Pow(Function):
     def forward(self, x: np.ndarray) -> np.ndarray:
         return x**self.c
 
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0]._data
-        gx = self.c * x ** (self.c - 1) * gy
+    def backward(self, gy: Tensor) -> Tensor:
+        x = self.inputs[0]
+        gx: Tensor = self.c * x ** (self.c - 1) * gy  # type: ignore
 
         return gx
-
-
-class Sin(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return np.sin(x)
-
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0]._data
-        gx = gy * np.cos(x)
-
-        return gx
-
-
-class Cos(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return np.cos(x)
-
-    def backward(self, gy: np.ndarray) -> np.ndarray:
-        x: np.ndarray = self.inputs[0]._data
-        gx = -gy * np.sin(x)
-
-        return gx
-
-
-def square(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
-    return Square()(x)
-
-
-def exp(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
-    return Exp()(x)
 
 
 def add(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.add.html"""
+
     return Add()(x0, x1)
 
 
 def mul(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.mul.html"""
+
     return Mul()(x0, x1)
 
 
-def neg(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def neg(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.neg.html"""
+
     return Neg()(x)
 
 
 def sub(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.sub.html"""
+
     return Sub()(x0, x1)
 
 
 def rsub(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Sub()(x1, x0)
 
 
 def div(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.div.html"""
+
     return Div()(x0, x1)
 
 
 def rdiv(
-    x0: types.INPUT_TYPE | Tensor, x1: types.INPUT_TYPE | Tensor
+    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Div()(x1, x0)
 
 
-def pow(x: types.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+def pow(x: torch.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.pow.html"""
+
     return Pow(c)(x)
-
-
-def sin(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
-    return Sin()(x)
-
-
-def cos(x: types.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
-    return Cos()(x)
 
 
 def setup_tensor() -> None:
@@ -640,7 +586,99 @@ def setup_tensor() -> None:
     Tensor.__pow__ = pow  # type: ignore
 
 
-if __name__ == "__main__":
-    x = Tensor(np.array(2.0))
-    y = pow(x, 3)
-    print(y)
+def as_tensor(obj: torch.INPUT_TYPE | Tensor) -> Tensor:
+    if isinstance(obj, Tensor):
+        return obj
+    return Tensor(obj)
+
+
+def set_logging_level(
+    level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"],
+) -> None:
+    """Set the logging level.
+
+    Args:
+        level: The logging level to set
+    """
+    logger.remove()
+    logger.add(sys.stdout, level=level)
+
+
+@contextlib.contextmanager
+def using_config(name: str, value: bool) -> Generator[None, None, None]:
+    """Context manager to set a config value temporarily.
+
+    Args:
+        name: The name of the config to set
+        value: The value to set the config to
+    """
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+
+def no_grad() -> ContextManager[None]:
+    """Context manager to disable gradient calculation."""
+    return using_config("enable_backprop", False)
+
+
+def tensor(
+    data: torch.INPUT_TYPE,
+    dtype: torch.TORCH_DTYPE | None = None,
+    requires_grad: bool = False,
+    name: str | None = None,
+) -> Tensor:
+    """An imitation of torch.tensor in PyTorch
+
+    Originally, torch.tensor is written in C++.
+    Python binding code:
+        https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/python_torch_functions_manual.cpp#L243-L267
+    """
+    return Tensor(data, dtype, requires_grad, name)
+
+
+def ones(
+    *size: int,
+    dtype: torch.TORCH_DTYPE | None = None,
+    requires_grad: bool = False,
+    name: str | None = None,
+) -> Tensor:
+    """Create a tensor with all elements set to 1.
+
+    https://pytorch.org/docs/stable/generated/torch.ones.html
+
+    Args:
+        size: The size of the tensor.
+        dtype: The dtype of the tensor.
+        requires_grad: Whether to require gradients for the tensor.
+        name: The name of the tensor.
+    """
+    return Tensor(np.ones(size), dtype, requires_grad, name)
+
+
+def ones_like(
+    input: Tensor,
+    *,
+    dtype: torch.TORCH_DTYPE | None = None,
+    requires_grad: bool = False,
+    name: str | None = None,
+) -> Tensor:
+    """Create a tensor with all elements set to 1.
+
+    https://pytorch.org/docs/stable/generated/torch.ones_like.html
+
+    Args:
+        input: The input tensor.
+    """
+    if not isinstance(input, Tensor):
+        raise ValueError(f"Input must be a Tensor. Got {type(input)}.")
+
+    return ones(
+        *input.size(),
+        dtype=dtype if dtype else input.dtype,
+        requires_grad=requires_grad,
+        name=name,
+    )

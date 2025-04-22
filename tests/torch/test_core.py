@@ -1,53 +1,12 @@
 from functools import partial
-from typing import Callable
 
 import numpy as np
 import pytest
 
 import torch
+from torch import Tensor
 
-from .complex_funcs import goldstein, matyas, sphere
-
-
-def numerical_diff(
-    f: Callable[
-        [torch.INPUT_TYPE | torch.Tensor],
-        torch.Tensor | tuple[torch.Tensor, ...],
-    ],
-    x: torch.Tensor,
-    eps: float = 1e-4,
-) -> float:
-    """Calculate the numerical gradient of a function.
-
-    The central difference is more accurate than the forward difference.
-    See: http://www.ohiouniversityfaculty.com/youngt/IntNumMeth/lecture27.pdf
-
-    Args:
-        f: A function that takes a Tensor and returns a Tensor.
-        x: The input Tensor.
-        eps: The epsilon value for numerical differentiation.
-    """
-    x_data: np.ndarray = x._data
-    x0 = torch.tensor(x_data - eps)
-    x1 = torch.tensor(x_data + eps)
-    y0 = f(x0)
-    y1 = f(x1)
-
-    assert isinstance(y0, torch.Tensor), (
-        "The case that the output is a tuple of Tensors is not considered yet. "
-        "If you met the case, please implement."
-    )
-    assert isinstance(y1, torch.Tensor), (
-        "The case that the output is a tuple of Tensors is not considered yet. "
-        "If you met the case, please implement."
-    )
-
-    numerator = y1._data - y0._data
-    if isinstance(numerator, np.ndarray) and numerator.size == 1:
-        numerator = float(numerator[0])
-    denominator = 2 * eps
-
-    return numerator / denominator
+from .utils import numerical_diff
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -77,42 +36,6 @@ def test_tensor_init_with_invalid_type() -> None:
         t = torch.tensor("invalid")
 
 
-def test_square_backward() -> None:
-    """Test the backward propagation of the square function."""
-    x = torch.tensor(np.array(2.0), requires_grad=True)
-    y = torch.square(x)
-    assert isinstance(y, torch.Tensor)
-
-    y.backward()
-
-    # Analytical gradient
-    analytical_grad = x.grad
-
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.square, x)
-
-    # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
-
-
-def test_exp_backward() -> None:
-    """Test the backward propagation of the exp function."""
-    x = torch.tensor(np.array(1.0), requires_grad=True)
-    y = torch.exp(x)
-    assert isinstance(y, torch.Tensor)
-
-    y.backward()
-
-    # Analytical gradient
-    analytical_grad = x.grad
-
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.exp, x)
-
-    # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
-
-
 def test_mul_backward() -> None:
     """Test the backward propagation of the mul function."""
     x0 = torch.tensor(np.array(2.0), requires_grad=True)
@@ -132,8 +55,12 @@ def test_mul_backward() -> None:
     numerical_x1_grad = numerical_diff(partial(torch.mul, x0), x1)
 
     # Check if they're close
-    assert np.allclose(analytical_x0_grad, numerical_x0_grad)
-    assert np.allclose(analytical_x1_grad, numerical_x1_grad)
+    assert analytical_x0_grad is not None
+    assert analytical_x1_grad is not None
+    assert numerical_x0_grad is not None
+    assert numerical_x1_grad is not None
+    assert np.allclose(analytical_x0_grad._data, numerical_x0_grad)
+    assert np.allclose(analytical_x1_grad._data, numerical_x1_grad)
 
 
 def test_neg_backward() -> None:
@@ -151,7 +78,9 @@ def test_neg_backward() -> None:
     numerical_grad = numerical_diff(torch.neg, x)
 
     # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_sub_backward() -> None:
@@ -167,7 +96,9 @@ def test_sub_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.sub, x1=np.array(200.0)), x)
 
     # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_rsub_backward() -> None:
@@ -183,7 +114,9 @@ def test_rsub_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.rsub, x1=np.array(200.0)), x)
 
     # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_div_backward() -> None:
@@ -202,7 +135,9 @@ def test_div_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.div, x1=x1), x0)
 
     # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_rdiv_backward() -> None:
@@ -220,7 +155,9 @@ def test_rdiv_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.rdiv, x1=4), x)
 
     # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 def test_multi_branch_backward() -> None:
@@ -232,11 +169,18 @@ def test_multi_branch_backward() -> None:
                         ----> [square] -> (c) ------
     """
     x = torch.tensor(np.array(1.0), requires_grad=True)
+
     a = torch.square(x)
+    assert isinstance(a, Tensor)
+
     b = torch.square(a)
+    assert isinstance(b, Tensor)
+
     c = torch.square(a)
+    assert isinstance(c, Tensor)
+
     y = torch.add(b, c)
-    assert isinstance(y, torch.Tensor)
+    assert isinstance(y, Tensor)
 
     y.backward()
 
@@ -254,7 +198,9 @@ def test_multi_branch_backward() -> None:
 
     grad_x = numerical_diff(torch.square, torch.tensor(grad_a))
 
-    assert np.allclose(analytical_grad, grad_x)
+    assert analytical_grad is not None
+    assert grad_x is not None
+    assert np.allclose(analytical_grad._data, grad_x)
 
 
 def test_pow_backward() -> None:
@@ -272,30 +218,33 @@ def test_pow_backward() -> None:
     numerical_grad = numerical_diff(partial(torch.pow, c=3), x)
 
     # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)
 
 
 @pytest.mark.parametrize(  # type: ignore
-    "retain_grad",
+    "retain_graph",
     [True, False],
 )
-def test_retain_grad(retain_grad: bool) -> None:
-    """Test the retain_grad argument of the backward method.
+def test_retain_graph(retain_graph: bool) -> None:
+    """Test the retain_graph argument of the backward method.
 
-    If retain_grad is True, the gradient of the tensor is not None.
-    If retain_grad is False, the gradient of the tensor is None.
+    If retain_graph is True, the gradient of the tensor is not None.
+    If retain_graph is False, the gradient of the tensor is None.
     """
     x0 = torch.tensor(np.array(1.0), requires_grad=True)
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
+
     t = torch.add(x0, x1)
+    assert isinstance(t, Tensor)
+
     y = torch.square(t)
+    assert isinstance(y, Tensor)
 
-    assert isinstance(y, torch.Tensor)
-    assert isinstance(t, torch.Tensor)
+    y.backward(retain_graph=retain_graph)
 
-    y.backward(retain_grad=retain_grad)
-
-    if retain_grad:
+    if retain_graph:
         assert t.grad is not None
         assert y.grad is not None
     else:
@@ -374,7 +323,7 @@ def test_forward_with_no_grad() -> None:
     assert y.creator is not None
     assert y.creator.inputs is not None
     assert y.creator.outputs is not None
-    assert np.allclose(x.grad, 4.0)
+    assert np.allclose(x.grad._data, 4.0)
 
 
 def test_item_single_element() -> None:
@@ -460,7 +409,7 @@ def test_dtype_unsupported() -> None:
     with pytest.raises(ValueError) as excinfo:
         dtype = t.dtype
 
-    assert "Unsupported dtype" in str(excinfo.value)
+    assert "Unsupported NumPy dtype" in str(excinfo.value)
 
 
 def test_requires_grad_with_non_float_dtype() -> None:
@@ -527,112 +476,273 @@ def test_backward_without_requires_grad() -> None:
     )
 
 
-def test_sphere_function_backward() -> None:
-    """Test gradients of the sphere function using numerical differentiation."""
-    # Create input tensors
-    x = torch.tensor([2.0], requires_grad=True)
-    y = torch.tensor([3.0], requires_grad=True)
+def test_tensor_data_getter() -> None:
+    """Test the `data` property getter returns a detached tensor."""
+    x_data = np.array([1.0, 2.0], dtype=np.float32)
+    x = torch.tensor(x_data, requires_grad=True)
+    y = torch.square(x)  # Create some history
 
-    # Forward pass
-    z = sphere(x, y)
+    assert isinstance(y, Tensor)
 
-    # Backward pass (analytical gradient)
-    z.backward()
+    data_tensor = y.data
 
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
-
-    # Calculate numerical gradients
-    dx_numerical = numerical_diff(lambda x: sphere(x, y), x)
-    dy_numerical = numerical_diff(lambda y: sphere(x, y), y)
-
-    # Check if they match
-    assert np.allclose(dx_analytical, dx_numerical)
-    assert np.allclose(dy_analytical, dy_numerical)
+    assert isinstance(data_tensor, Tensor)
+    # The data property should return a detached tensor
+    assert data_tensor.requires_grad is False
+    assert data_tensor.creator is None
+    assert data_tensor.grad_fn is None
+    # Check if the underlying numpy data is the same
+    assert np.array_equal(data_tensor._data, y._data)
+    # Ensure the original tensor is unchanged
+    assert y.requires_grad is True
+    assert y.creator is not None
 
 
-def test_goldstein_function_backward() -> None:
-    """Test gradients of the Goldstein-Price function using numerical differentiation."""
-    # Create input tensors
-    x = torch.tensor([-0.5], requires_grad=True)
-    y = torch.tensor([0.5], requires_grad=True)
+def test_tensor_detach() -> None:
+    """Test the `detach` method returns a new tensor detached from the graph."""
+    x_data = np.array([1.0, 2.0], dtype=np.float32)
+    x = torch.tensor(x_data, requires_grad=True)
+    y = torch.square(x)  # y requires grad and has a creator
 
-    # Forward pass
-    z = goldstein(x, y)
+    assert isinstance(y, Tensor)
 
-    # Backward pass (analytical gradient)
-    z.backward()
+    detached_y = y.detach()
 
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
+    # Check detached tensor properties
+    assert isinstance(detached_y, Tensor)
+    assert detached_y.requires_grad is False
+    assert detached_y.creator is None
+    assert detached_y.grad_fn is None
+    assert detached_y.dtype == y.dtype
+    assert np.array_equal(detached_y._data, y._data)
 
-    # Calculate numerical gradients
-    dx_numerical = numerical_diff(lambda x: goldstein(x, y), x)
-    dy_numerical = numerical_diff(lambda y: goldstein(x, y), y)
+    # Ensure the original tensor is unchanged
+    assert y.requires_grad is True
+    assert y.creator is not None
 
-    # Check if they match
-    assert np.allclose(dx_analytical, dx_numerical, rtol=1e-3, atol=1e-3)
-    assert np.allclose(dy_analytical, dy_numerical, rtol=1e-3, atol=1e-3)
-
-
-def test_matyas_function_backward() -> None:
-    """Test gradients of the Matyas function using numerical differentiation."""
-    # Create input tensors
-    x = torch.tensor([1.5], requires_grad=True)
-    y = torch.tensor([2.0], requires_grad=True)
-
-    # Forward pass
-    z = matyas(x, y)
-
-    # Backward pass (analytical gradient)
-    z.backward()
-
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
-
-    # Calculate numerical gradients
-    dx_numerical = numerical_diff(lambda x: matyas(x, y), x)
-    dy_numerical = numerical_diff(lambda y: matyas(x, y), y)
-
-    # Check if they match
-    assert np.allclose(dx_analytical, dx_numerical)
-    assert np.allclose(dy_analytical, dy_numerical)
+    # Check that the underlying numpy data is shared (modifying detached affects original)
+    # Note: This depends on the Tensor constructor not forcing a copy.
+    # If the constructor copies, this part of the test might fail.
+    detached_y._data[0] = 99.0
+    assert y._data[0] == 99.0
 
 
-def test_sin_backward() -> None:
-    """Test the backward propagation of the sin function."""
-    x = torch.tensor(np.array(1.0), requires_grad=True)
+def test_tensor_detach_data_sharing() -> None:
+    """Verify if detach shares the underlying numpy array."""
+    original_data = np.array([1.0, 2.0])
+    t = torch.tensor(original_data, requires_grad=True)
+    detached_t = t.detach()
+
+    # Check if they reference the same numpy array object
+    assert detached_t._data is t._data
+
+    # Modify the detached tensor's data
+    detached_t._data[0] = 100.0
+
+    # Check if the original tensor's data is also modified
+    assert t._data[0] == 100.0
+
+    # Modify the original tensor's data
+    t._data[1] = 200.0
+
+    # Check if the detached tensor's data is also modified
+    assert detached_t._data[1] == 200.0
+
+
+def test_ones() -> None:
+    """Test the `ones` function for creating tensors."""
+    # Test basic creation
+    t1 = torch.ones(2, 3)
+    assert isinstance(t1, Tensor)
+    assert t1.shape == torch.Size(2, 3)
+    # Default dtype might vary, but check it's a float type if no dtype specified
+    assert t1.dtype in (torch.float32, torch.float64)
+    assert np.array_equal(t1._data, np.ones((2, 3), dtype=t1._data.dtype))
+    assert t1.requires_grad is False
+
+    # Test with specified dtype (integer)
+    t2 = torch.ones(4, dtype=torch.int32)
+    assert isinstance(t2, Tensor)
+    assert t2.shape == torch.Size(
+        4,
+    )
+    assert t2.dtype == torch.int32
+    assert np.array_equal(t2._data, np.ones(4, dtype=np.int32))
+    assert t2.requires_grad is False
+
+    # Test with specified dtype (float) and requires_grad
+    t3 = torch.ones(1, 2, dtype=torch.float32, requires_grad=True)
+    assert isinstance(t3, Tensor)
+    assert t3.shape == torch.Size(1, 2)
+    assert t3.dtype == torch.float32
+    assert np.array_equal(t3._data, np.ones((1, 2), dtype=np.float32))
+    assert t3.requires_grad is True
+
+    # Test with name
+    t4 = torch.ones(5, name="test_ones_tensor")
+    assert isinstance(t4, Tensor)
+    assert t4.shape == torch.Size(
+        5,
+    )
+    assert np.array_equal(t4._data, np.ones(5, dtype=t4._data.dtype))
+    assert t4.requires_grad is False
+    assert t4.name == "test_ones_tensor"
+
+
+def test_ones_like() -> None:
+    """Test the `ones_like` function."""
+    # Input tensor with float dtype
+    input1 = torch.tensor(
+        np.array([[1.0, 2.0], [3.0, 4.0]]), dtype=torch.float32, requires_grad=True
+    )
+
+    # Basic test: inherit shape, dtype, requires_grad
+    t1 = torch.ones_like(input1)
+    assert isinstance(t1, Tensor)
+    assert t1.shape == input1.shape
+    assert t1.dtype == input1.dtype
+    # ones_like should default requires_grad to False unless overridden
+    assert t1.requires_grad is False
+    assert np.array_equal(t1._data, np.ones_like(input1._data))
+
+    # Test overriding dtype (to int)
+    t2 = torch.ones_like(input1, dtype=torch.int64)
+    assert isinstance(t2, Tensor)
+    assert t2.shape == input1.shape
+    assert t2.dtype == torch.int64
+    assert t2.requires_grad is False
+    assert np.array_equal(t2._data, np.ones_like(input1._data, dtype=np.int64))
+
+    # Test overriding requires_grad
+    t3 = torch.ones_like(input1, requires_grad=True)
+    assert isinstance(t3, Tensor)
+    assert t3.shape == input1.shape
+    assert t3.dtype == input1.dtype
+    assert t3.requires_grad is True
+    assert np.array_equal(t3._data, np.ones_like(input1._data))
+
+    # Test overriding dtype and requires_grad
+    t4 = torch.ones_like(input1, dtype=torch.float64, requires_grad=True)
+    assert isinstance(t4, Tensor)
+    assert t4.shape == input1.shape
+    assert t4.dtype == torch.float64
+    assert t4.requires_grad is True
+    assert np.array_equal(t4._data, np.ones_like(input1._data, dtype=np.float64))
+
+    # Test with name
+    t5 = torch.ones_like(input1, name="test_ones_like")
+    assert isinstance(t5, Tensor)
+    assert t5.shape == input1.shape
+    assert t5.dtype == input1.dtype
+    assert t5.requires_grad is False
+    assert t5.name == "test_ones_like"
+    assert np.array_equal(t5._data, np.ones_like(input1._data))
+
+    # Test with non-tensor input -> raises ValueError
+    with pytest.raises(ValueError):
+        torch.ones_like(np.array([1, 2, 3]))
+
+    # Test with integer input tensor
+    input_int = torch.tensor([5, 6], dtype=torch.int32)
+    t6 = torch.ones_like(input_int)
+    assert isinstance(t6, Tensor)
+    assert t6.shape == input_int.shape
+    assert t6.dtype == input_int.dtype
+    assert t6.requires_grad is False  # Cannot require grad for int
+    assert np.array_equal(t6._data, np.ones_like(input_int._data))
+
+    # Test overriding requires_grad on int input (should fail if dtype not float)
+    with pytest.raises(RuntimeError):
+        torch.ones_like(input_int, requires_grad=True)
+
+    # Test overriding requires_grad on int input with float dtype (should work)
+    t7 = torch.ones_like(input_int, dtype=torch.float32, requires_grad=True)
+    assert isinstance(t7, Tensor)
+    assert t7.shape == input_int.shape
+    assert t7.dtype == torch.float32
+    assert t7.requires_grad is True
+    assert np.array_equal(t7._data, np.ones_like(input_int._data, dtype=np.float32))
+
+
+def test_sin_higher_order_derivatives() -> None:
+    """Test computation of higher-order derivatives for sin(x)."""
+    # Use float64 for better numerical precision with higher derivatives
+    x = torch.tensor(
+        np.linspace(-np.pi, np.pi, 50), dtype=torch.float64, requires_grad=True
+    )
+    x_np = x.numpy()
+
+    # --- 0th derivative ---
     y = torch.sin(x)
-    assert isinstance(y, torch.Tensor)
+    assert isinstance(y, Tensor)
 
-    y.backward()
+    # --- 1st derivative ---
+    # Gradient for backward() on non-scalar output
+    x.grad = None
+    y.backward(create_graph=True)
+    y_prime = x.grad
+    assert y_prime is not None
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # --- 2nd derivative ---
+    x.grad = None
+    # Differentiate y' w.r.t x
+    y_prime.backward(create_graph=True)
+    y_double_prime = x.grad
+    assert y_double_prime is not None
 
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.sin, x)
+    # --- 3rd derivative ---
+    x.grad = None
+    # Differentiate y'' w.r.t x
+    y_double_prime.backward(create_graph=False)
+    y_triple_prime = x.grad
+    assert y_triple_prime is not None
 
-    # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+    # --- Analytical Derivatives ---
+    analytical_y_prime = np.cos(x_np)
+    analytical_y_double_prime = -np.sin(x_np)
+    analytical_y_triple_prime = -np.cos(x_np)
+
+    # --- Comparisons ---
+    # Use a reasonable tolerance, especially for higher derivatives
+    atol = 1e-6
+    assert np.allclose(y_prime.numpy(), analytical_y_prime, atol=atol)
+    assert np.allclose(y_double_prime.numpy(), analytical_y_double_prime, atol=atol)
+    assert np.allclose(y_triple_prime.numpy(), analytical_y_triple_prime, atol=atol)
 
 
-def test_cos_backward() -> None:
-    """Test the backward propagation of the cos function."""
-    x = torch.tensor(np.array(1.0), requires_grad=True)
-    y = torch.cos(x)
-    assert isinstance(y, torch.Tensor)
+def test_convert_to_numpy_force_false() -> None:
+    """Test the numpy() method with default force=False (memory sharing)."""
+    original_data = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    t = torch.tensor(original_data, requires_grad=True)
 
-    y.backward()
+    np_array = t.numpy()  # force=False by default
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    assert isinstance(np_array, np.ndarray)
+    assert np.array_equal(np_array, original_data)
+    # Check for memory sharing
+    assert np_array is t._data  # Should return the exact same object
 
-    # Numerical gradient
-    numerical_grad = numerical_diff(torch.cos, x)
+    # Modify the numpy array and check if the tensor's data changes
+    np_array[0] = 100.0
+    assert t._data[0] == 100.0
 
-    # Check if they're close
-    assert np.allclose(analytical_grad, numerical_grad)
+
+def test_convert_to_numpy_force_true() -> None:
+    """Test the numpy() method with force=True (deep copy)."""
+    original_data = np.array([10, 20, 30], dtype=np.int64)
+    t = torch.tensor(original_data)
+
+    np_array_copy = t.numpy(force=True)
+
+    assert isinstance(np_array_copy, np.ndarray)
+    assert np.array_equal(np_array_copy, original_data)
+    # Check for NO memory sharing
+    assert np_array_copy is not t._data
+
+    # Modify the copied numpy array and check the tensor's data remains unchanged
+    np_array_copy[0] = 999
+    assert t._data[0] == 10
+
+    # Modify the tensor's data and check the copied array remains unchanged
+    t._data[1] = 888
+    assert np_array_copy[1] == 20

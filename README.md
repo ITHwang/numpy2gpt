@@ -13,12 +13,13 @@
 </p>
 
 # Overview
-- An educational implementation of GPT from scratch using numpy, inspired by [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3) and [nanoGPT](https://github.com/karpathy/nanoGPT).
+- An educational implementation of GPT from scratch using numpy, heavily inspired by [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3), [nanoGPT](https://github.com/karpathy/nanoGPT), and [pytorch](https://github.com/pytorch/pytorch).
 
 # Concepts
 
 ## 1. Auto Differentiation
-1. Auto Differentiation is a core algorithm for neural networks to compute backpropagation by following the chain rule.
+
+1. [Auto Differentiation](https://openreview.net/pdf?id=BJJsrmfCZ) is a core algorithm for neural networks to compute backpropagation by following the chain rule.
 2. To implement the chain rule, we need to satisfy the following requirements:
   - During forward propagation,
     1. A function gets input tensors and returns output tensors.
@@ -32,6 +33,7 @@
   - `Creator`
     - A function that generates a tensor.
     - When backpropagating, each output tensor refers to its `Creator` so that the creator can compute the gradient of the output tensor.
+
     ```mermaid
     graph LR
     Tensor1[Tensor] --> Function[Function]
@@ -41,6 +43,7 @@
     Function -. "outputs" .-> Tensor2
     Tensor2 -. "creator" .-> Function
     ```
+
   - `Generation`
     - Each node(tensor or function) has its generation that means the order of the node being created.
     - Being started from 0, the generation number is incremented when the node is created.
@@ -50,6 +53,7 @@
       - E.g., in the following diagram, the `dy/da` is the sum of `dy/db * db/da` and `dy/dc * dc/da`.
       - But there's a risk that the node `a` passes them one by one, which makes backpropagation being performed twice.
       - To avoid this, we need to compute gradients of tensors at older generation first and accumulate the gradients of the tensors that were inputted to multiple functions.
+
     ```mermaid
     graph LR
       x((x @ 0)) --> Func1[Func1 @ 0]
@@ -62,7 +66,7 @@
       c --> Func4[Func4 @ 2]
       Func4 --> y((y @ 3))
     ```
-4. `Memory Optimization`
+4. Memory Optimization
   - As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
   - To avoid this, we use `weakref.ref` for the outputs of the function.
   - Using weakref.ref for output tensors eliminates circular references, reducing memory usage by 72% (from 136.4 MiB to 38.2 MiB) in our test([measure_memory.py](./torch/measure_memory.py)).
@@ -128,10 +132,13 @@ This library implements a subset of PyTorch's tensor operations from scratch usi
 ### 1.1. Supported Operations
 
 - **Creation**: `torch.tensor()` - Create tensors from Python scalars, lists, or NumPy arrays
-- **Arithmetic**: Addition (`+`), Subtraction (`-`), Multiplication (`*`), Division (`/`), Negation (`-`)
-- **Mathematical**: `square()`, `exp()`, `pow()`
+- **Arithmetic**: Addition, Subtraction, Multiplication, Division, Negation, Power
+- **Mathematical**: `square()`, `exp()`, `cos()`, `sin()`, `tanh()`
+- **In-place Operations**: TBD
 
-### 1.2. Autograd Support
+### 1.2. Autograd
+
+- Autograd is a core algorithm for neural networks to compute backpropagation by following the chain rule.
 
 ```python
 # Example of autograd
@@ -141,13 +148,56 @@ y.backward()  # Backward pass
 print(x.grad)  # Access gradients
 ```
 
-### 1.3. Properties
+- Using that, we can implement gradient descent.
 
-- **Define-by-Run**: Computational graph is constructed dynamically during execution
-- **Type Safety**: Only floating-point tensors can require gradients
-- **No-grad Mode**: Context manager to disable gradient tracking during inference
-- **Gradient Accumulation**: Support for complex computational graphs
-- **Memory Optimization**: Uses weak references to avoid circular reference memory leaks
+  - Code
+
+    ```python
+    # Source: https://github.com/oreilly-japan/deep-learning-from-scratch-3/blob/master/steps/step28.py
+
+    import torch
+    from torch import Tensor
+
+    def f(x: torch.Tensor) -> torch.Tensor:
+        """f(x) = x^4 - 2x^2"""
+        y = x**4 - 2 * x**2
+
+        return y
+
+      x = torch.tensor(2.0, requires_grad=True)
+      lr = 0.01
+      iters = 1000
+
+      for i in range(iters):
+          print(i, x)
+
+          y = f(x)
+
+          x.grad = None
+          y.backward()
+
+          with torch.no_grad():
+              x -= lr * x.grad
+    ```
+  
+  - Output
+    ```text
+    0 tensor(2.0, dtype=torch.float64, requires_grad=True)
+    1 tensor(1.76, dtype=torch.float64, requires_grad=True)
+    2 tensor(1.61232896, dtype=torch.float64, requires_grad=True)
+    3 tensor(1.5091654023014192, dtype=torch.float64, requires_grad=True)
+    4 tensor(1.4320422081467723, dtype=torch.float64, requires_grad=True)
+    5 tensor(1.3718537670818505, dtype=torch.float64, requires_grad=True)
+    ...
+    386 tensor(1.0000000000000036, dtype=torch.float64, requires_grad=True)
+    387 tensor(1.0000000000000033, dtype=torch.float64, requires_grad=True)
+    388 tensor(1.000000000000003, dtype=torch.float64, requires_grad=True)
+    389 tensor(1.0000000000000029, dtype=torch.float64, requires_grad=True)
+    390 tensor(1.0000000000000027, dtype=torch.float64, requires_grad=True)
+    ...
+    ```
+
+
 
 ## 2. Neural Network Visualization
 
@@ -167,8 +217,12 @@ The library provides robust tools for visualizing computational graphs, which he
   - Windows: Download installer from the Graphviz website
 
 ### 2.2. Basic Usage
+
 - Code
+
   ```python
+  # Source: https://github.com/oreilly-japan/deep-learning-from-scratch-3/blob/master/steps/step26.py
+
   import torch
   from torch.utils import plot_dot_graph
   from tests.torch.complex_funcs import goldstein
@@ -183,12 +237,15 @@ The library provides robust tools for visualizing computational graphs, which he
   z.name = "z"
   plot_dot_graph(z, "goldstein.png", verbose=True)
   ```
+
 - Output
+
   ![visualization_goldstein](./asset/img/visualization_goldstein.png)
 
-
 ### 2.3. Details
+
 - The visualization can be exported in any format supported by Graphviz:
+
   ```python
   # DOT file (raw graph definition)
   plot_dot_graph(z, "graph.dot", verbose=True)
@@ -198,20 +255,205 @@ The library provides robust tools for visualizing computational graphs, which he
   plot_dot_graph(z, "graph.svg", verbose=True)  # SVG
   plot_dot_graph(z, "graph.pdf", verbose=True)  # PDF
   ```
+
 - The `verbose` parameter controls the amount of information displayed:
+
   ```python
   # Minimal visualization (just the graph structure)
   plot_dot_graph(z, "minimal_graph.png", verbose=False)
 
   # Detailed visualization (with tensor names, shapes, and dtypes)
   plot_dot_graph(z, "detailed_graph.png", verbose=True)
+  ```
+
 - Understanding the Graph
   - **Orange nodes**: Tensor objects (inputs and intermediate values)
   - **Green nodes**: Named tensor objects (when verbose=True and tensor has a name)
   - **Blue boxes**: Operations (functions that transform tensors)
   - **Arrows**: Data flow direction between operations and tensors
 
+## 3. Higher-order Derivatives
+
+Higher-order derivatives involve taking the derivative of a function multiple times. For instance, the second derivative is the derivative of the first derivative, the third derivative is the derivative of the second derivative, and so on. These are crucial in various mathematical and scientific applications, including optimization algorithms and analyzing function curvature.
+
+### 3.1. Implementation
+
+To support higher-order differentiation, backpropagations should build a computational graph as well as forward propagations.
+
+1. When we do `Tensor.backward(create_graph=True)`, the operations performed during gradient computations extends the computational graph. For that, we toggle the `enable_backprop` to `create_graph` by using the `using_config` context manager.
+2. Gradients, nodes in the graph, should also be tensors, which allows us to call `backward()` again on the resulting gradient tensor.
+
+### 3.2. Example 1: higher-order derivatives of sin function
+
+Here are computational graphs illustrating the forward and backward propagations of `sin(x)`.:
+
+- When `create_graph` is set to `False`(default),
+
+```mermaid
+graph LR
+  subgraph x
+    x_data((data))
+    x_grad((grad))
+  end
+  subgraph y
+    y_data((data))
+    y_grad((grad))
+  end
+  subgraph gy
+    gy_data((data))
+    gy_grad((grad))
+  end
+  subgraph gx
+    gx_data((data))
+    gx_grad((grad))
+  end
+
+  x --> sin[sin / forward] --> y
+  x_grad -.-> gx
+  y_grad -.-> gy
+```
+
+- When `create_graph` is set to `True`,
+
+```mermaid
+graph LR
+  subgraph x
+    x_data((data))
+    x_grad((grad))
+  end
+  subgraph y
+    y_data((data))
+    y_grad((grad))
+  end
+  subgraph cosine_of_x
+    cos_data((data))
+    cos_grad((grad))
+  end
+  subgraph "gx"
+    gx_data((data))
+    gx_grad((grad))
+  end
+  subgraph "gy"
+    gy_data((data))
+    gy_grad((grad))
+  end
+
+  x --> sin[sin / forward] --> y
+  x --> cos[cos / backward] --> cosine_of_x
+  cosine_of_x --> mul[mul / backward]
+  gy --> mul
+  mul --> gx
+  x_grad -.-> gx
+  y_grad -.-> gy
+```
+
+In the graphs:
+- The forward pass computes `y = sin(x)`.
+- Both graphs computes the derivativve `gx`($ f'(x) = \cos(x) \cdot \frac{dy}{dy} $).
+- The only difference is that the `create_graph=True` graph also constructs the backward computational graph (the `cos` and `mul` operations shown) that represents this derivative calculation.
+
+Base on that, we can implement higher-order derivatives of sin function.
+
+- Code
+
+  ```python
+  # Source: https://github.com/oreilly-japan/deep-learning-from-scratch-3/blob/master/steps/step34.py
+
+  import matplotlib.pyplot as plt
+  import numpy as np
+
+  import torch
+
+  x = torch.tensor(np.linspace(-7, 7, 200), requires_grad=True)
+  y = torch.sin(x)
+  y.backward(create_graph=True)
+
+  logs = [y._data]
+
+  for i in range(3):
+      logs.append(x.grad._data)
+
+      gx = x.grad
+
+      x.grad = None
+      gx.backward(create_graph=True)
+
+  labels = ["y=sin(x)", "y'", "y''", "y'''"]
+
+  for i, v in enumerate(logs):
+      plt.plot(x._data, logs[i], label=labels[i])
+
+  plt.legend(loc="lower right")
+  plt.savefig("sin_derivatives.png")
+  ```
+
+- Output
+
+  ![sin_derivatives](./asset/img/sin_derivatives.png)
+
+#### 3.3. Example 2: Newton's Method for Optimization
+
+Newton's method is an iterative optimization algorithm that uses second-order derivative information to find the minimum of a function. The update rule is:
+
+$$ x_{new} = x_{old} - \frac{f'(x_{old})}{f''(x_{old})} $$
+
+This requires computing both the first derivative $ f'(x) $ and the second derivative $ f''(x) $. Our implementation of higher-order derivatives allows this directly:
+
+- Code
+
+  ```python
+  # Source: https://github.com/oreilly-japan/deep-learning-from-scratch-3/blob/master/steps/step33.py
+
+  import torch
+
+
+  def f(x: torch.Tensor) -> torch.Tensor:
+      """f(x) = x^4 - 2x^2"""
+      y = x**4 - 2 * x**2
+
+      return y
+
+
+  x = torch.tensor(2.0, requires_grad=True)
+  iters = 10
+
+  for i in range(iters):
+      print(i, x)
+
+      # Compute first derivative: f'(x)
+      y = f(x)
+      x.grad = None 
+      y.backward(create_graph=True) # Keep graph for second derivative
+
+      # Compute second derivative: f''(x)
+      gx = x.grad # gx = f'(x)
+      x.grad = None # Clear previous grad
+      gx.backward() # Compute gradient of gx w.r.t x
+      gx2 = x.grad # gx2 = f''(x)
+
+      # Update x using Newton's method
+      with torch.no_grad():
+          x -= gx / gx2
+  ```
+
+- Output
+
+  ```
+  0 tensor(2.0, dtype=torch.float64, requires_grad=True)
+  1 tensor(1.4545454545454546, dtype=torch.float64, requires_grad=True)
+  2 tensor(1.1510467893775467, dtype=torch.float64, requires_grad=True)
+  3 tensor(1.0253259289766978, dtype=torch.float64, requires_grad=True)
+  4 tensor(1.0009084519430513, dtype=torch.float64, requires_grad=True)
+  5 tensor(1.0000012353089454, dtype=torch.float64, requires_grad=True)
+  6 tensor(1.000000000002289, dtype=torch.float64, requires_grad=True)
+  7 tensor(1.0, dtype=torch.float64, requires_grad=True)
+  8 tensor(1.0, dtype=torch.float64, requires_grad=True)
+  9 tensor(1.0, dtype=torch.float64, requires_grad=True)
+  ```
+- Pro: As you can see above, Newton's method can converge faster than gradient descent.
+- Cons: Computing the full [Hessian matrix](https://en.wikipedia.org/wiki/Hessian_matrix)(for multivariate functions) can be computationally expensive. For an input vector $ \textbf{x} \in \mathbb{R}^n $, the Hessian matrix takes $ \mathcal{O}(n^2) $ space for storing all elements, and has the $ \mathcal{O}(n^3) $ time complexity for computing the inverse of the matrix.
+- Alternative: To mitigate the computational cost, Several [Quasi-Newton methods](https://en.wikipedia.org/wiki/Quasi-Newton_method) have been introduced, using approximations of the derivatives of the functions in place of exact derivatives. **L-BFGS**, one of the Quasi-Newton methods, approximates the Hessian or its inverse using only first-order gradient information, offering a balance between the rapid convergence of Newton's method and the lower computational cost of first-order methods. PyTorch provides the implementation in [torch.optim.LBFGS](https://pytorch.org/docs/stable/generated/torch.optim.LBFGS.html).
+
 # References
-- [pytorch](https://github.com/pytorch/pytorch)
 - [PyTorch Pocket Reference](https://www.oreilly.com/library/view/pytorch-pocket-reference/9781492089995)
-- Paszke, Adam, et al. "Automatic differentiation ni pytorch." (2017). [link](https://openreview.net/pdf?id=BJJsrmfCZ)
+- [모두를 위한 컨벡스 최적화 - 18. Quasi-Newton Methods](https://convex-optimization-for-all.github.io/contents/chapter18)
