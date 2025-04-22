@@ -80,20 +80,30 @@ class Tanh(Function):
 
 
 def sin(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.sin.html"""
+
     return Sin()(x)
 
 
 def cos(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.cos.html"""
+
     return Cos()(x)
 
 
 def square(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.square.html"""
+
     return Square()(x)
 
 
 def exp(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.exp.html"""
+
     return Exp()(x)
 
 
 def tanh(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.tanh.html"""
+
     return Tanh()(x)

@@ -502,22 +502,30 @@ class Pow(Function):
 def add(
     x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.add.html"""
+
     return Add()(x0, x1)
 
 
 def mul(
     x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.mul.html"""
+
     return Mul()(x0, x1)
 
 
 def neg(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.neg.html"""
+
     return Neg()(x)
 
 
 def sub(
     x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.sub.html"""
+
     return Sub()(x0, x1)
 
 
@@ -530,6 +538,8 @@ def rsub(
 def div(
     x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.div.html"""
+
     return Div()(x0, x1)
 
 
@@ -540,6 +550,8 @@ def rdiv(
 
 
 def pow(x: torch.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.pow.html"""
+
     return Pow(c)(x)
 
 
