@@ -43,7 +43,7 @@ def numerical_diff(
         x: The input Tensor.
         eps: The epsilon value for numerical differentiation.
     """
-    x_data: np.ndarray = x._data
+    x_data: np.ndarray = x.numpy()
     x0 = torch.tensor(x_data - eps)
     x1 = torch.tensor(x_data + eps)
     y0 = f(x0)
@@ -58,7 +58,7 @@ def numerical_diff(
         "If you met the case, please implement."
     )
 
-    numerator = y1._data - y0._data
+    numerator = y1.numpy() - y0.numpy()
     if isinstance(numerator, np.ndarray) and numerator.size == 1:
         numerator = float(numerator[0])
     denominator = 2 * eps
