@@ -68,6 +68,17 @@ class Exp(Function):
         return gx
 
 
+class Tanh(Function):
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return np.tanh(x)
+
+    def backward(self, gy: Tensor) -> Tensor:
+        y = self.outputs[0]()
+        gx: Tensor = gy * (1 - y * y)
+
+        return gx
+
+
 def sin(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Sin()(x)
 
@@ -82,3 +93,7 @@ def square(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
 
 def exp(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     return Exp()(x)
+
+
+def tanh(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    return Tanh()(x)

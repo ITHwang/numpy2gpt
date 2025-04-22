@@ -170,3 +170,23 @@ def test_cos_backward() -> None:
     assert analytical_grad is not None
     assert numerical_grad is not None
     assert np.allclose(analytical_grad._data, numerical_grad)
+
+
+def test_tanh_backward() -> None:
+    """Test the backward propagation of the tanh function."""
+    x = torch.tensor(np.array(5.0), requires_grad=True)
+    y = torch.tanh(x)
+    assert isinstance(y, torch.Tensor)
+
+    y.backward()
+
+    # Analytical gradient
+    analytical_grad = x.grad
+
+    # Numerical gradient
+    numerical_grad = numerical_diff(torch.tanh, x)
+
+    # Check if they're close
+    assert analytical_grad is not None
+    assert numerical_grad is not None
+    assert np.allclose(analytical_grad._data, numerical_grad)

@@ -25,6 +25,7 @@ from torch.functions import (
     exp,
     sin,
     square,
+    tanh,
 )
 from torch.types import (
     ARRAY_TYPE,
@@ -67,6 +68,7 @@ __all__ = [
     "sub",
     "cos",
     "sin",
+    "tanh",
     "tensor",
     "using_config",
     "ARRAY_TYPE",
