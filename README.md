@@ -18,7 +18,8 @@
 # Concepts
 
 ## 1. Auto Differentiation
-1. Auto Differentiation is a core algorithm for neural networks to compute backpropagation by following the chain rule.
+
+1. [Auto Differentiation](https://openreview.net/pdf?id=BJJsrmfCZ) is a core algorithm for neural networks to compute backpropagation by following the chain rule.
 2. To implement the chain rule, we need to satisfy the following requirements:
   - During forward propagation,
     1. A function gets input tensors and returns output tensors.
@@ -453,8 +454,6 @@ This requires computing both the first derivative $ f'(x) $ and the second deriv
 - Cons: Computing the full [Hessian matrix](https://en.wikipedia.org/wiki/Hessian_matrix)(for multivariate functions) can be computationally expensive. For an input vector $ \textbf{x} \in \mathbb{R}^n $, the Hessian matrix takes $ \mathcal{O}(n^2) $ space for storing all elements, and has the $ \mathcal{O}(n^3) $ time complexity for computing the inverse of the matrix.
 - Alternative: To mitigate the computational cost, Several [Quasi-Newton methods](https://en.wikipedia.org/wiki/Quasi-Newton_method) have been introduced, using approximations of the derivatives of the functions in place of exact derivatives. **L-BFGS**, one of the Quasi-Newton methods, approximates the Hessian or its inverse using only first-order gradient information, offering a balance between the rapid convergence of Newton's method and the lower computational cost of first-order methods. PyTorch provides the implementation in [torch.optim.LBFGS](https://pytorch.org/docs/stable/generated/torch.optim.LBFGS.html).
 
-## TODO: test case for higher-order derivatives
-
 # References
 - [PyTorch Pocket Reference](https://www.oreilly.com/library/view/pytorch-pocket-reference/9781492089995)
-- Paszke, Adam, et al. "Automatic differentiation ni pytorch." (2017). [link](https://openreview.net/pdf?id=BJJsrmfCZ)
+- [모두를 위한 컨벡스 최적화 - 18. Quasi-Newton Methods](https://convex-optimization-for-all.github.io/contents/chapter18)

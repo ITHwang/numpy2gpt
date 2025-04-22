@@ -662,3 +662,87 @@ def test_ones_like() -> None:
     assert t7.dtype == torch.float32
     assert t7.requires_grad is True
     assert np.array_equal(t7._data, np.ones_like(input_int._data, dtype=np.float32))
+
+
+def test_sin_higher_order_derivatives() -> None:
+    """Test computation of higher-order derivatives for sin(x)."""
+    # Use float64 for better numerical precision with higher derivatives
+    x = torch.tensor(
+        np.linspace(-np.pi, np.pi, 50), dtype=torch.float64, requires_grad=True
+    )
+    x_np = x.numpy()
+
+    # --- 0th derivative ---
+    y = torch.sin(x)
+    assert isinstance(y, Tensor)
+
+    # --- 1st derivative ---
+    # Gradient for backward() on non-scalar output
+    x.grad = None
+    y.backward(create_graph=True)
+    y_prime = x.grad
+    assert y_prime is not None
+
+    # --- 2nd derivative ---
+    x.grad = None
+    # Differentiate y' w.r.t x
+    y_prime.backward(create_graph=True)
+    y_double_prime = x.grad
+    assert y_double_prime is not None
+
+    # --- 3rd derivative ---
+    x.grad = None
+    # Differentiate y'' w.r.t x
+    y_double_prime.backward(create_graph=False)
+    y_triple_prime = x.grad
+    assert y_triple_prime is not None
+
+    # --- Analytical Derivatives ---
+    analytical_y_prime = np.cos(x_np)
+    analytical_y_double_prime = -np.sin(x_np)
+    analytical_y_triple_prime = -np.cos(x_np)
+
+    # --- Comparisons ---
+    # Use a reasonable tolerance, especially for higher derivatives
+    atol = 1e-6
+    assert np.allclose(y_prime.numpy(), analytical_y_prime, atol=atol)
+    assert np.allclose(y_double_prime.numpy(), analytical_y_double_prime, atol=atol)
+    assert np.allclose(y_triple_prime.numpy(), analytical_y_triple_prime, atol=atol)
+
+
+def test_convert_to_numpy_force_false() -> None:
+    """Test the numpy() method with default force=False (memory sharing)."""
+    original_data = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    t = torch.tensor(original_data, requires_grad=True)
+
+    np_array = t.numpy()  # force=False by default
+
+    assert isinstance(np_array, np.ndarray)
+    assert np.array_equal(np_array, original_data)
+    # Check for memory sharing
+    assert np_array is t._data  # Should return the exact same object
+
+    # Modify the numpy array and check if the tensor's data changes
+    np_array[0] = 100.0
+    assert t._data[0] == 100.0
+
+
+def test_convert_to_numpy_force_true() -> None:
+    """Test the numpy() method with force=True (deep copy)."""
+    original_data = np.array([10, 20, 30], dtype=np.int64)
+    t = torch.tensor(original_data)
+
+    np_array_copy = t.numpy(force=True)
+
+    assert isinstance(np_array_copy, np.ndarray)
+    assert np.array_equal(np_array_copy, original_data)
+    # Check for NO memory sharing
+    assert np_array_copy is not t._data
+
+    # Modify the copied numpy array and check the tensor's data remains unchanged
+    np_array_copy[0] = 999
+    assert t._data[0] == 10
+
+    # Modify the tensor's data and check the copied array remains unchanged
+    t._data[1] = 888
+    assert np_array_copy[1] == 20

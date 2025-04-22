@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import sys
 import weakref
 from typing import ContextManager, Generator, Iterator, Literal, Sized
@@ -212,6 +213,23 @@ class Tensor:
         Refer: https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/TensorShape.cpp#L4504
         """
         return Tensor(data=self._data, dtype=self.dtype, requires_grad=False, name=None)
+
+    def numpy(self, force: bool = False) -> np.ndarray:
+        """Convert the tensor to a numpy array.
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.numpy.html
+
+        Args:
+            force: Whether to force the conversion.
+                If True, The ndarray may be a copy of the tensor instead of always sharing memory.
+                If False, The returned ndarray and the tensor will share their storage.
+                Defaults to False.
+        """
+
+        if force:
+            return copy.deepcopy(self._data)
+        else:
+            return self._data
 
     def backward(
         self, retain_graph: bool | None = None, create_graph: bool = False
