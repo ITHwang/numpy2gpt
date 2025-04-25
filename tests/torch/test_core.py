@@ -168,7 +168,7 @@ def test_multi_branch_backward() -> None:
                         |                          |
                         ----> [square] -> (c) ------
     """
-    x = torch.tensor(np.array(1.0), requires_grad=True)
+    x = torch.tensor(np.array(5.0), requires_grad=True)
 
     a = torch.square(x)
     assert isinstance(a, Tensor)
@@ -196,7 +196,7 @@ def test_multi_branch_backward() -> None:
         + numerical_diff(torch.square, a) * grad_c
     )
 
-    grad_x = numerical_diff(torch.square, torch.tensor(grad_a))
+    grad_x = numerical_diff(torch.square, x) * grad_a
 
     assert automatic_grad is not None
     assert grad_x is not None

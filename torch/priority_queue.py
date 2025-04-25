@@ -5,14 +5,19 @@ T = TypeVar("T")
 
 
 class PriorityQueue(Generic[T]):
+    """A priority queue that supports push and pop operations.
+
+    heapq is a min-heap, so we negate the priority value to make it a max-heap.
+    """
+
     def __init__(self) -> None:
         self._queue: list[tuple[float, int, T]] = []
-        self._index: int = 0
 
     def push(self, item: T, priority: float) -> None:
         """Add an item to the queue with the given priority."""
-        heapq.heappush(self._queue, (priority, self._index, item))
-        self._index += 1
+        # NOTE: id(item) is just for breaking ties in the queue.
+        # The order of items with the same priority does not matter.
+        heapq.heappush(self._queue, (-priority, id(item), item))
 
     def pop(self) -> T:
         """Remove and return the item with the lowest priority value."""

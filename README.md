@@ -135,6 +135,7 @@ This library implements a subset of PyTorch's tensor operations from scratch usi
 - **Arithmetic**: Addition, Subtraction, Multiplication, Division, Negation, Power
 - **Mathematical**: `square()`, `exp()`, `cos()`, `sin()`, `tanh()`
 - **In-place Operations**: TBD
+- See: [torch](https://pytorch.org/docs/stable/torch.html), [torch.Tensor](https://pytorch.org/docs/stable/tensors.html).
 
 ### 1.2. Autograd
 

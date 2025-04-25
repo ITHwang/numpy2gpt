@@ -144,6 +144,7 @@ class Tensor:
     @creator.setter
     def creator(self, func: Function) -> None:
         self._creator = func
+        self.generation = func.generation + 1
 
     @property
     def grad_fn(self) -> Function | None:
