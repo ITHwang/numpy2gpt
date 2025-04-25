@@ -69,7 +69,7 @@
 4. Memory Optimization
   - As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
   - To avoid this, we use `weakref.ref` for the outputs of the function.
-  - Using weakref.ref for output tensors eliminates circular references, reducing memory usage by 72% (from 136.4 MiB to 38.2 MiB) in our test([measure_memory.py](./torch/measure_memory.py)).
+  - Using weakref.ref for output tensors eliminates circular references, reducing memory usage by 72% (from 136.4 MiB to 38.2 MiB) in [our test](./torch/measure_memory.py).
 
 ## 2. Define-by-Run vs. Define-and-Run
 
@@ -455,5 +455,6 @@ This requires computing both the first derivative $ f'(x) $ and the second deriv
 - Alternative: To mitigate the computational cost, Several [Quasi-Newton methods](https://en.wikipedia.org/wiki/Quasi-Newton_method) have been introduced, using approximations of the derivatives of the functions in place of exact derivatives. **L-BFGS**, one of the Quasi-Newton methods, approximates the Hessian or its inverse using only first-order gradient information, offering a balance between the rapid convergence of Newton's method and the lower computational cost of first-order methods. PyTorch provides the implementation in [torch.optim.LBFGS](https://pytorch.org/docs/stable/generated/torch.optim.LBFGS.html).
 
 # References
+- [PyTorch: torch.Tensor](https://pytorch.org/docs/stable/tensors.html)
 - [PyTorch Pocket Reference](https://www.oreilly.com/library/view/pytorch-pocket-reference/9781492089995)
 - [모두를 위한 컨벡스 최적화 - 18. Quasi-Newton Methods](https://convex-optimization-for-all.github.io/contents/chapter18)

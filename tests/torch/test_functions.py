@@ -13,16 +13,16 @@ def test_square_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(torch.square, x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_exp_backward() -> None:
@@ -33,16 +33,16 @@ def test_exp_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(torch.exp, x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_sphere_function_backward() -> None:
@@ -54,24 +54,24 @@ def test_sphere_function_backward() -> None:
     # Forward pass
     z = sphere(x, y)
 
-    # Backward pass (analytical gradient)
+    # Backward pass (automatic gradient)
     z.backward()
 
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
+    # Automatic gradients
+    dx_automatic = x.grad
+    dy_automatic = y.grad
 
     # Calculate numerical gradients
     dx_numerical = numerical_diff(lambda x: sphere(x, y), x)
     dy_numerical = numerical_diff(lambda y: sphere(x, y), y)
 
     # Check if they match
-    assert dx_analytical is not None
-    assert dy_analytical is not None
+    assert dx_automatic is not None
+    assert dy_automatic is not None
     assert dx_numerical is not None
     assert dy_numerical is not None
-    assert np.allclose(dx_analytical._data, dx_numerical)
-    assert np.allclose(dy_analytical._data, dy_numerical)
+    assert np.allclose(dx_automatic._data, dx_numerical)
+    assert np.allclose(dy_automatic._data, dy_numerical)
 
 
 def test_goldstein_function_backward() -> None:
@@ -83,24 +83,24 @@ def test_goldstein_function_backward() -> None:
     # Forward pass
     z = goldstein(x, y)
 
-    # Backward pass (analytical gradient)
+    # Backward pass (automatic gradient)
     z.backward()
 
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
+    # Automatic gradients
+    dx_automatic = x.grad
+    dy_automatic = y.grad
 
     # Calculate numerical gradients
     dx_numerical = numerical_diff(lambda x: goldstein(x, y), x)
     dy_numerical = numerical_diff(lambda y: goldstein(x, y), y)
 
     # Check if they match
-    assert dx_analytical is not None
-    assert dy_analytical is not None
+    assert dx_automatic is not None
+    assert dy_automatic is not None
     assert dx_numerical is not None
     assert dy_numerical is not None
-    assert np.allclose(dx_analytical._data, dx_numerical, rtol=1e-3, atol=1e-3)
-    assert np.allclose(dy_analytical._data, dy_numerical, rtol=1e-3, atol=1e-3)
+    assert np.allclose(dx_automatic._data, dx_numerical, rtol=1e-3, atol=1e-3)
+    assert np.allclose(dy_automatic._data, dy_numerical, rtol=1e-3, atol=1e-3)
 
 
 def test_matyas_function_backward() -> None:
@@ -115,21 +115,21 @@ def test_matyas_function_backward() -> None:
     # Backward pass (analytical gradient)
     z.backward()
 
-    # Get analytical gradients
-    dx_analytical = x.grad
-    dy_analytical = y.grad
+    # Automatic gradients
+    dx_automatic = x.grad
+    dy_automatic = y.grad
 
     # Calculate numerical gradients
     dx_numerical = numerical_diff(lambda x: matyas(x, y), x)
     dy_numerical = numerical_diff(lambda y: matyas(x, y), y)
 
     # Check if they match
-    assert dx_analytical is not None
-    assert dy_analytical is not None
+    assert dx_automatic is not None
+    assert dy_automatic is not None
     assert dx_numerical is not None
     assert dy_numerical is not None
-    assert np.allclose(dx_analytical._data, dx_numerical)
-    assert np.allclose(dy_analytical._data, dy_numerical)
+    assert np.allclose(dx_automatic._data, dx_numerical)
+    assert np.allclose(dy_automatic._data, dy_numerical)
 
 
 def test_sin_backward() -> None:
@@ -140,16 +140,16 @@ def test_sin_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(torch.sin, x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_cos_backward() -> None:
@@ -160,16 +160,16 @@ def test_cos_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(torch.cos, x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_tanh_backward() -> None:
@@ -180,13 +180,13 @@ def test_tanh_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(torch.tanh, x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)

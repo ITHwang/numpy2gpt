@@ -46,21 +46,21 @@ def test_mul_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_x0_grad = x0.grad
-    analytical_x1_grad = x1.grad
+    # Automatic gradient
+    automatic_x0_grad = x0.grad
+    automatic_x1_grad = x1.grad
 
     # Numerical gradient
     numerical_x0_grad = numerical_diff(partial(torch.mul, x1), x0)
     numerical_x1_grad = numerical_diff(partial(torch.mul, x0), x1)
 
     # Check if they're close
-    assert analytical_x0_grad is not None
-    assert analytical_x1_grad is not None
+    assert automatic_x0_grad is not None
+    assert automatic_x1_grad is not None
     assert numerical_x0_grad is not None
     assert numerical_x1_grad is not None
-    assert np.allclose(analytical_x0_grad._data, numerical_x0_grad)
-    assert np.allclose(analytical_x1_grad._data, numerical_x1_grad)
+    assert np.allclose(automatic_x0_grad._data, numerical_x0_grad)
+    assert np.allclose(automatic_x1_grad._data, numerical_x1_grad)
 
 
 def test_neg_backward() -> None:
@@ -71,16 +71,16 @@ def test_neg_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(torch.neg, x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_sub_backward() -> None:
@@ -89,16 +89,16 @@ def test_sub_backward() -> None:
     y = x - np.array(200.0)
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(partial(torch.sub, x1=np.array(200.0)), x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_rsub_backward() -> None:
@@ -107,16 +107,16 @@ def test_rsub_backward() -> None:
     y = np.array(200.0) - x
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(partial(torch.rsub, x1=np.array(200.0)), x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_div_backward() -> None:
@@ -128,16 +128,16 @@ def test_div_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x0.grad
+    # Automatic gradient
+    automatic_grad = x0.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(partial(torch.div, x1=x1), x0)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_rdiv_backward() -> None:
@@ -148,16 +148,16 @@ def test_rdiv_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(partial(torch.rdiv, x1=4), x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 def test_multi_branch_backward() -> None:
@@ -184,8 +184,8 @@ def test_multi_branch_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     grad_b, grad_c = np.array(1), np.array(1)
@@ -198,9 +198,9 @@ def test_multi_branch_backward() -> None:
 
     grad_x = numerical_diff(torch.square, torch.tensor(grad_a))
 
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert grad_x is not None
-    assert np.allclose(analytical_grad._data, grad_x)
+    assert np.allclose(automatic_grad._data, grad_x)
 
 
 def test_pow_backward() -> None:
@@ -211,16 +211,16 @@ def test_pow_backward() -> None:
 
     y.backward()
 
-    # Analytical gradient
-    analytical_grad = x.grad
+    # Automatic gradient
+    automatic_grad = x.grad
 
     # Numerical gradient
     numerical_grad = numerical_diff(partial(torch.pow, c=3), x)
 
     # Check if they're close
-    assert analytical_grad is not None
+    assert automatic_grad is not None
     assert numerical_grad is not None
-    assert np.allclose(analytical_grad._data, numerical_grad)
+    assert np.allclose(automatic_grad._data, numerical_grad)
 
 
 @pytest.mark.parametrize(  # type: ignore
@@ -697,17 +697,17 @@ def test_sin_higher_order_derivatives() -> None:
     y_triple_prime = x.grad
     assert y_triple_prime is not None
 
-    # --- Analytical Derivatives ---
-    analytical_y_prime = np.cos(x_np)
-    analytical_y_double_prime = -np.sin(x_np)
-    analytical_y_triple_prime = -np.cos(x_np)
+    # --- Automatic Derivatives ---
+    automatic_y_prime = np.cos(x_np)
+    automatic_y_double_prime = -np.sin(x_np)
+    automatic_y_triple_prime = -np.cos(x_np)
 
     # --- Comparisons ---
     # Use a reasonable tolerance, especially for higher derivatives
     atol = 1e-6
-    assert np.allclose(y_prime.numpy(), analytical_y_prime, atol=atol)
-    assert np.allclose(y_double_prime.numpy(), analytical_y_double_prime, atol=atol)
-    assert np.allclose(y_triple_prime.numpy(), analytical_y_triple_prime, atol=atol)
+    assert np.allclose(y_prime.numpy(), automatic_y_prime, atol=atol)
+    assert np.allclose(y_double_prime.numpy(), automatic_y_double_prime, atol=atol)
+    assert np.allclose(y_triple_prime.numpy(), automatic_y_triple_prime, atol=atol)
 
 
 def test_convert_to_numpy_force_false() -> None:
