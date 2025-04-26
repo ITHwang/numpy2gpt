@@ -9,8 +9,17 @@ from typing import ContextManager, Generator, Iterator, Literal, Sized
 import numpy as np
 from loguru import logger
 
-import torch
-from torch.priority_queue import PriorityQueue
+from .priority_queue import PriorityQueue
+from .types import (
+    INPUT_TYPE,
+    INPUT_TYPE_TUPLE,
+    NUMERIC_TYPE,
+    NUMPY_DTYPE,
+    TORCH_DTYPE,
+    torch2np,
+    type_np2torch,
+    type_torch2np,
+)
 
 
 class Tensor:
@@ -30,8 +39,8 @@ class Tensor:
 
     def __init__(
         self,
-        data: torch.INPUT_TYPE,
-        dtype: torch.TORCH_DTYPE | None = None,
+        data: INPUT_TYPE | int | float | None,
+        dtype: TORCH_DTYPE | None = None,
         requires_grad: bool = False,
         name: str | None = None,
     ) -> None:
@@ -61,7 +70,7 @@ class Tensor:
             requires_grad: Whether to require gradients for the tensor.
             name: You can give a name to the tensor. This is useful for debugging and visualization.
         """
-        if isinstance(data, torch.INPUT_TYPE_TUPLE):
+        if isinstance(data, INPUT_TYPE_TUPLE):
             if isinstance(data, np.ndarray):
                 pass
             else:
@@ -74,7 +83,7 @@ class Tensor:
             # copy=False ensures that we don't create a copy if the dtype
             # already matches, which is crucial for detach() to work correctly
             # (i.e., share the underlying numpy array).
-            data_type: torch.NUMPY_DTYPE = torch.type_torch2np(dtype)
+            data_type: NUMPY_DTYPE = type_torch2np(dtype)
             data = data.astype(data_type, copy=False)
 
         if (
@@ -156,23 +165,33 @@ class Tensor:
 
     @property
     def ndim(self) -> int:
-        item_: np.ndarray = self._data
+        """The number of dimensions of the tensor.
 
-        return int(item_.ndim)
+        Alias for `dim()`
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.ndim.html
+        """
+        return self.dim()
 
     @property
     def shape(self) -> Size:
+        """The shape of the tensor.
+
+        Alias for `size()`
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.shape.html
+        """
         return self.size()
 
     @property
-    def dtype(self) -> torch.TORCH_DTYPE:
+    def dtype(self) -> TORCH_DTYPE:
         item_: np.ndarray = self._data
 
-        return torch.type_np2torch(item_.dtype)
+        return type_np2torch(item_.dtype)
 
     @dtype.setter
-    def dtype(self, input_dtype: torch.TORCH_DTYPE) -> None:
-        data_type: torch.NUMPY_DTYPE = torch.type_torch2np(input_dtype)
+    def dtype(self, input_dtype: TORCH_DTYPE) -> None:
+        data_type: NUMPY_DTYPE = type_torch2np(input_dtype)
 
         self._data = self._data.astype(data_type, copy=False)
 
@@ -191,11 +210,15 @@ class Tensor:
             return True
 
     def size(self) -> Size:
+        """The size of the tensor.
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.size.html
+        """
         item_: np.ndarray = self._data
 
         return Size(*item_.shape)
 
-    def item(self) -> torch.NUMERIC_TYPE:
+    def item(self) -> NUMERIC_TYPE:
         data_: np.ndarray = self._data
 
         if data_.size > 1:
@@ -245,6 +268,42 @@ class Tensor:
             return copy.deepcopy(self._data)
         else:
             return self._data
+
+    def dim(self) -> int:
+        """The number of dimensions of the tensor.
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.dim.html
+        """
+        item_: np.ndarray = self._data
+
+        return int(item_.ndim)
+
+    def type(self, dtype: TORCH_DTYPE | None = None) -> str | Tensor:
+        """Returns the type if dtype is not provided, else casts this object to the specified type.
+
+        Returned tensor shares the same underlying storage(memory) with this tensor.
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.type.html
+        """
+        if dtype:
+            if dtype not in torch2np:
+                raise ValueError(
+                    f"dtype must be a torch.TORCH_DTYPE. Got {type(dtype)}."
+                )
+
+            if self.dtype == dtype:
+                return self
+
+            data_type: NUMPY_DTYPE = type_torch2np(dtype)
+            self._data = self._data.astype(data_type, copy=False)
+
+            return Tensor(
+                data=copy.copy(self._data),
+                dtype=dtype,
+                requires_grad=self.requires_grad,
+            )
+        else:
+            return str(self.dtype)
 
     def backward(
         self, retain_graph: bool | None = None, create_graph: bool = False
@@ -378,9 +437,7 @@ class Size:
 
 
 class Function:
-    def __call__(
-        self, *input_args: torch.INPUT_TYPE | Tensor
-    ) -> Tensor | tuple[Tensor, ...]:
+    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
         """Do forward propagation.
         self.generation: the generation of the function.
             A function gets inputs and outputs.
@@ -533,7 +590,7 @@ class Pow(Function):
 
 
 def add(
-    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     """https://pytorch.org/docs/stable/generated/torch.add.html"""
 
@@ -541,21 +598,21 @@ def add(
 
 
 def mul(
-    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     """https://pytorch.org/docs/stable/generated/torch.mul.html"""
 
     return Mul()(x0, x1)
 
 
-def neg(x: torch.INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def neg(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
     """https://pytorch.org/docs/stable/generated/torch.neg.html"""
 
     return Neg()(x)
 
 
 def sub(
-    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     """https://pytorch.org/docs/stable/generated/torch.sub.html"""
 
@@ -563,13 +620,13 @@ def sub(
 
 
 def rsub(
-    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Sub()(x1, x0)
 
 
 def div(
-    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     """https://pytorch.org/docs/stable/generated/torch.div.html"""
 
@@ -577,12 +634,12 @@ def div(
 
 
 def rdiv(
-    x0: torch.INPUT_TYPE | Tensor, x1: torch.INPUT_TYPE | Tensor
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
 ) -> Tensor | tuple[Tensor, ...]:
     return Div()(x1, x0)
 
 
-def pow(x: torch.INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
     """https://pytorch.org/docs/stable/generated/torch.pow.html"""
 
     return Pow(c)(x)
@@ -601,7 +658,7 @@ def setup_tensor() -> None:
     Tensor.__pow__ = pow  # type: ignore
 
 
-def as_tensor(obj: torch.INPUT_TYPE | Tensor) -> Tensor:
+def as_tensor(obj: INPUT_TYPE | Tensor) -> Tensor:
     if isinstance(obj, Tensor):
         return obj
     return Tensor(obj)
@@ -641,8 +698,8 @@ def no_grad() -> ContextManager[None]:
 
 
 def tensor(
-    data: torch.INPUT_TYPE,
-    dtype: torch.TORCH_DTYPE | None = None,
+    data: INPUT_TYPE,
+    dtype: TORCH_DTYPE | None = None,
     requires_grad: bool = False,
     name: str | None = None,
 ) -> Tensor:
@@ -657,7 +714,7 @@ def tensor(
 
 def ones(
     *size: int,
-    dtype: torch.TORCH_DTYPE | None = None,
+    dtype: TORCH_DTYPE | None = None,
     requires_grad: bool = False,
     name: str | None = None,
 ) -> Tensor:
@@ -677,7 +734,7 @@ def ones(
 def ones_like(
     input: Tensor,
     *,
-    dtype: torch.TORCH_DTYPE | None = None,
+    dtype: TORCH_DTYPE | None = None,
     requires_grad: bool = False,
     name: str | None = None,
 ) -> Tensor:

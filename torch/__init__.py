@@ -38,6 +38,8 @@ from torch.types import (
     float64,
     int32,
     int64,
+    np2torch,
+    torch2np,
     type_np2torch,
     type_torch2np,
 )
@@ -85,4 +87,6 @@ __all__ = [
     "type_torch2np",
     "ones",
     "ones_like",
+    "np2torch",
+    "torch2np",
 ]

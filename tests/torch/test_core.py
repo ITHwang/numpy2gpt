@@ -780,3 +780,57 @@ def test_is_leaf() -> None:
     t5_op = t5_base * 2
     t5_detached: Tensor = t5_op.detach()  # type: ignore
     assert t5_detached.is_leaf is True, "Case 5 Failed: Detached tensor should be leaf"
+
+
+def test_tensor_type_method() -> None:
+    """Test the type() method for getting and setting the tensor dtype."""
+    # --- Test getting type ---
+    t_float64 = torch.tensor([1.0, 2.0], dtype=torch.float64)
+    assert t_float64.dtype == torch.float64
+    assert t_float64.type() == "torch.float64"
+
+    # --- Test setting type (casting) ---
+    t_orig = torch.tensor([1.5, 2.5, 3.5], dtype=torch.float64, requires_grad=True)
+    original_data_ptr = id(t_orig._data)
+
+    # Cast to float32
+    t_float32 = t_orig.type(torch.float32)
+
+    # Should be a new tensor instance (even if data shared)
+    assert isinstance(t_float32, Tensor)
+    assert t_float32 is not t_orig
+    assert t_float32.dtype == torch.float32
+    assert t_float32.type() == "torch.float32"
+
+    # Original tensor's dtype is changed in-place by .type()
+    assert id(t_float32._data) == original_data_ptr
+
+    # Cast to float32 (expected to return the same tensor object)
+    t_float32_2 = t_float32.type(torch.float32)
+    assert isinstance(t_float32_2, Tensor)
+    assert t_float32_2 is t_float32
+    assert id(t_float32_2._data) == original_data_ptr
+
+    # --- Test invalid dtype argument ---
+    with pytest.raises(ValueError) as excinfo:
+        t_float32_2.type("not a dtype")  # type: ignore
+    assert "dtype must be a torch.TORCH_DTYPE" in str(excinfo.value)
+
+
+def test_tensor_dim_method() -> None:
+    """Test the dim() method."""
+    t0 = torch.tensor(5.0)  # scalar
+    t1 = torch.tensor([1.0, 2.0])  # vector
+    t2 = torch.tensor([[1, 2], [3, 4]])  # matrix
+    t3 = torch.tensor([[[1]]])  # 3d tensor
+
+    assert t0.dim() == 0
+    assert t1.dim() == 1
+    assert t2.dim() == 2
+    assert t3.dim() == 3
+
+    # Test alias ndim
+    assert t0.ndim == 0
+    assert t1.ndim == 1
+    assert t2.ndim == 2
+    assert t3.ndim == 3
