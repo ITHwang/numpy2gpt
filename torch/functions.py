@@ -76,7 +76,9 @@ class Tanh(Function):
 
     def backward(self, gy: Tensor) -> Tensor:
         y = self.outputs[0]()
-        gx: Tensor = gy * (1 - y * y)
+        gx = gy * (1 - y * y)
+
+        assert isinstance(gx, Tensor), f"gx is not a Tensor: {type(gx)}"
 
         return gx
 

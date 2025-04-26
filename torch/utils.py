@@ -2,13 +2,23 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
 from torch import Function, Tensor
 
-logger.remove()
-logger.add(sys.stdout, level="INFO")
+
+def set_logging_level(
+    level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"],
+) -> None:
+    """Set the logging level.
+
+    Args:
+        level: The logging level to set
+    """
+    logger.remove()
+    logger.add(sys.stdout, level=level)
 
 
 def _dot_var(v: Tensor, verbose: bool = False) -> str:

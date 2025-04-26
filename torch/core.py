@@ -22,6 +22,228 @@ from .types import (
 )
 
 
+class Function:
+    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+        """Do forward propagation.
+        self.generation: the generation of the function.
+            A function gets inputs and outputs.
+            e.g., [input] -> [function] -> [output]
+
+            The generation of the input will be the generation of the function.
+            The generation of the output is the generation of the function plus 1.
+            e.g., [input][gen=2] -> [function][gen=2] -> [output][gen=3]
+
+            Generation is for determining the order of backward propagation.
+            The backward propagation that has inputs with higher generation will be called first.
+            If the generations of inputs are different, the higher generation will be the one of the function.
+
+        Warning: Sometimes the output of the forward method is a scalar,
+            when the input is a zero-dimensional array.
+
+        Args:
+            input_args: list[Tensor] is expected, but also any numeric or array object can be accepted.
+
+        Returns:
+            Tensor | list[Tensor]
+        """
+        inputs: tuple[Tensor, ...] = tuple(as_tensor(input) for input in input_args)
+
+        # forward propagation
+        xs = tuple(input._data for input in inputs)
+        ys = self.forward(*xs)
+        if not isinstance(ys, tuple):
+            ys = (ys,)
+
+        # If any input requires grad, the output should require grad.
+        should_outputs_require_grad: bool = any(input.requires_grad for input in inputs)
+        outputs = tuple(
+            Tensor(y, requires_grad=should_outputs_require_grad) for y in ys
+        )
+
+        # When only inferencing, we can skip the logic below which is needed for backpropagation.
+        if Config.enable_backprop and should_outputs_require_grad:
+            # If the generations of inputs are different, the higher generation will be the one of the function.
+            self.generation = max([input.generation for input in inputs])
+
+            # set the creator(a.k.a. grad_fn) of the output
+            for output in outputs:
+                output.creator = self
+
+            # set the inputs and outputs
+            # NOTE: For memory optimization we wraps output tensors with weakref,
+            #       by removing the circular reference between the function and the output tensor.
+            self.inputs: tuple[Tensor, ...] = inputs
+            self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
+                weakref.ref(output) for output in outputs
+            )
+
+        return outputs if len(outputs) > 1 else outputs[0]
+
+    def forward(self, *xs: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
+        raise NotImplementedError
+
+    def backward(self, *gys: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
+        raise NotImplementedError
+
+
+class Add(Function):
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        if len(xs) != 2:
+            raise ValueError("Add must take two arguments")
+
+        x0, x1 = xs
+        y = x0 + x1
+
+        return y
+
+    def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
+        if len(gys) != 1:
+            raise ValueError("Add must take one argument")
+
+        gy = gys[0]
+
+        return gy, gy
+
+
+class Mul(Function):
+    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+        y = x0 * x1
+
+        return y
+
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
+        gx0 = gy * x1
+        gx1 = gy * x0
+
+        assert isinstance(gx0, Tensor), f"gx0 is not a Tensor: {type(gx0)}"
+        assert isinstance(gx1, Tensor), f"gx1 is not a Tensor: {type(gx1)}"
+
+        return gx0, gx1
+
+
+class Neg(Function):
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return -x
+
+    def backward(self, gy: Tensor) -> Tensor:
+        return -gy  # type: ignore
+
+
+class Sub(Function):
+    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+        return x0 - x1
+
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
+        gx0 = gy
+        gx1 = -gy
+
+        assert isinstance(gx0, Tensor), f"gx0 is not a Tensor: {type(gx0)}"
+        assert isinstance(gx1, Tensor), f"gx1 is not a Tensor: {type(gx1)}"
+
+        return gx0, gx1
+
+
+class Div(Function):
+    """Divide two tensors element-wise.
+
+    Actually, PyTorch differentiates the division operator in two ways:
+    - torch.div()
+        - If both inputs are integers, it performs floor division.(like '//' in Python 3)
+        - If either input is a float, it performs true division.
+    - torch.true_divide()
+        - Always performs true division, regardless of input types.
+        - The '/' operator between tensors is equivalent to torch.true_divide().
+
+    For simplicity, we only implement true division with the '/' operator.
+    """
+
+    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+        return x0 / x1
+
+    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+        x0, x1 = self.inputs
+
+        gx0 = gy / x1
+        gx1 = -gy * x0 / x1**2
+
+        assert isinstance(gx0, Tensor), f"gx0 is not a Tensor: {type(gx0)}"
+        assert isinstance(gx1, Tensor), f"gx1 is not a Tensor: {type(gx1)}"
+
+        return gx0, gx1
+
+
+class Pow(Function):
+    def __init__(self, c: int | float) -> None:
+        self.c = c
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return x**self.c
+
+    def backward(self, gy: Tensor) -> Tensor:
+        x = self.inputs[0]
+        gx: Tensor = self.c * x ** (self.c - 1) * gy  # type: ignore
+
+        return gx
+
+
+def add(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.add.html"""
+
+    return Add()(x0, x1)
+
+
+def mul(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.mul.html"""
+
+    return Mul()(x0, x1)
+
+
+def neg(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.neg.html"""
+
+    return Neg()(x)
+
+
+def sub(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.sub.html"""
+
+    return Sub()(x0, x1)
+
+
+def rsub(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Sub()(x1, x0)
+
+
+def div(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.div.html"""
+
+    return Div()(x0, x1)
+
+
+def rdiv(
+    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
+) -> Tensor | tuple[Tensor, ...]:
+    return Div()(x1, x0)
+
+
+def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+    """https://pytorch.org/docs/stable/generated/torch.pow.html"""
+
+    return Pow(c)(x)
+
+
 class Tensor:
     """An imitation of torch.Tensor in PyTorch
 
@@ -31,6 +253,23 @@ class Tensor:
     which stores autograd metadata fields including `grad_`, `grad_fn`, etc.
     See: https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/variable.h
     """
+
+    __add__ = add
+    __radd__ = add
+    __mul__ = mul
+    __rmul__ = mul
+    __neg__ = neg
+    __sub__ = sub
+    __rsub__ = rsub
+    __truediv__ = div
+    __rtruediv__ = rdiv
+    __pow__ = pow
+    add = add
+    mul = mul
+    neg = neg
+    sub = sub
+    div = div
+    pow = pow
 
     # NOTE: set the priority of tensor to be higher than numpy array.
     # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,
@@ -436,244 +675,10 @@ class Size:
         return f"torch.Size([{', '.join(str(arg) for arg in self.args)}])"
 
 
-class Function:
-    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
-        """Do forward propagation.
-        self.generation: the generation of the function.
-            A function gets inputs and outputs.
-            e.g., [input] -> [function] -> [output]
-
-            The generation of the input will be the generation of the function.
-            The generation of the output is the generation of the function plus 1.
-            e.g., [input][gen=2] -> [function][gen=2] -> [output][gen=3]
-
-            Generation is for determining the order of backward propagation.
-            The backward propagation that has inputs with higher generation will be called first.
-            If the generations of inputs are different, the higher generation will be the one of the function.
-
-        Warning: Sometimes the output of the forward method is a scalar,
-            when the input is a zero-dimensional array.
-
-        Args:
-            input_args: list[Tensor] is expected, but also any numeric or array object can be accepted.
-
-        Returns:
-            Tensor | list[Tensor]
-        """
-        inputs: tuple[Tensor, ...] = tuple(as_tensor(input) for input in input_args)
-
-        # forward propagation
-        xs = tuple(input._data for input in inputs)
-        ys = self.forward(*xs)
-        if not isinstance(ys, tuple):
-            ys = (ys,)
-
-        # If any input requires grad, the output should require grad.
-        should_outputs_require_grad: bool = any(input.requires_grad for input in inputs)
-        outputs = tuple(
-            Tensor(y, requires_grad=should_outputs_require_grad) for y in ys
-        )
-
-        # When only inferencing, we can skip the logic below which is needed for backpropagation.
-        if Config.enable_backprop and should_outputs_require_grad:
-            # If the generations of inputs are different, the higher generation will be the one of the function.
-            self.generation = max([input.generation for input in inputs])
-
-            # set the creator(a.k.a. grad_fn) of the output
-            for output in outputs:
-                output.creator = self
-
-            # set the inputs and outputs
-            # NOTE: For memory optimization we wraps output tensors with weakref,
-            #       by removing the circular reference between the function and the output tensor.
-            self.inputs: tuple[Tensor, ...] = inputs
-            self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
-                weakref.ref(output) for output in outputs
-            )
-
-        return outputs if len(outputs) > 1 else outputs[0]
-
-    def forward(self, *xs: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
-        raise NotImplementedError
-
-    def backward(self, *gys: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
-        raise NotImplementedError
-
-
-class Add(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
-        if len(xs) != 2:
-            raise ValueError("Add must take two arguments")
-
-        x0, x1 = xs
-        y = x0 + x1
-
-        return y
-
-    def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
-        if len(gys) != 1:
-            raise ValueError("Add must take one argument")
-
-        gy = gys[0]
-
-        return gy, gy
-
-
-class Mul(Function):
-    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
-        y = x0 * x1
-
-        return y
-
-    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
-        x0, x1 = self.inputs
-        gx0 = gy * x1
-        gx1 = gy * x0
-
-        return gx0, gx1
-
-
-class Neg(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return -x
-
-    def backward(self, gy: Tensor) -> Tensor:
-        return -gy  # type: ignore
-
-
-class Sub(Function):
-    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
-        return x0 - x1
-
-    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
-        return gy, -gy
-
-
-class Div(Function):
-    """Divide two tensors element-wise.
-
-    Actually, PyTorch differentiates the division operator in two ways:
-    - torch.div()
-        - If both inputs are integers, it performs floor division.(like '//' in Python 3)
-        - If either input is a float, it performs true division.
-    - torch.true_divide()
-        - Always performs true division, regardless of input types.
-        - The '/' operator between tensors is equivalent to torch.true_divide().
-
-    For simplicity, we only implement true division with the '/' operator.
-    """
-
-    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
-        return x0 / x1
-
-    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
-        x0, x1 = self.inputs
-
-        gx0 = gy / x1
-        gx1 = -gy * x0 / x1**2
-
-        return gx0, gx1
-
-
-class Pow(Function):
-    def __init__(self, c: int | float) -> None:
-        self.c = c
-
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        return x**self.c
-
-    def backward(self, gy: Tensor) -> Tensor:
-        x = self.inputs[0]
-        gx: Tensor = self.c * x ** (self.c - 1) * gy  # type: ignore
-
-        return gx
-
-
-def add(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    """https://pytorch.org/docs/stable/generated/torch.add.html"""
-
-    return Add()(x0, x1)
-
-
-def mul(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    """https://pytorch.org/docs/stable/generated/torch.mul.html"""
-
-    return Mul()(x0, x1)
-
-
-def neg(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
-    """https://pytorch.org/docs/stable/generated/torch.neg.html"""
-
-    return Neg()(x)
-
-
-def sub(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    """https://pytorch.org/docs/stable/generated/torch.sub.html"""
-
-    return Sub()(x0, x1)
-
-
-def rsub(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    return Sub()(x1, x0)
-
-
-def div(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    """https://pytorch.org/docs/stable/generated/torch.div.html"""
-
-    return Div()(x0, x1)
-
-
-def rdiv(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    return Div()(x1, x0)
-
-
-def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
-    """https://pytorch.org/docs/stable/generated/torch.pow.html"""
-
-    return Pow(c)(x)
-
-
-def setup_tensor() -> None:
-    Tensor.__add__ = add  # type: ignore
-    Tensor.__radd__ = add  # type: ignore
-    Tensor.__mul__ = mul  # type: ignore
-    Tensor.__rmul__ = mul  # type: ignore
-    Tensor.__neg__ = neg  # type: ignore
-    Tensor.__sub__ = sub  # type: ignore
-    Tensor.__rsub__ = rsub  # type: ignore
-    Tensor.__truediv__ = div  # type: ignore
-    Tensor.__rtruediv__ = rdiv  # type: ignore
-    Tensor.__pow__ = pow  # type: ignore
-
-
 def as_tensor(obj: INPUT_TYPE | Tensor) -> Tensor:
     if isinstance(obj, Tensor):
         return obj
     return Tensor(obj)
-
-
-def set_logging_level(
-    level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"],
-) -> None:
-    """Set the logging level.
-
-    Args:
-        level: The logging level to set
-    """
-    logger.remove()
-    logger.add(sys.stdout, level=level)
 
 
 @contextlib.contextmanager

@@ -14,8 +14,6 @@ from torch.core import (
     pow,
     rdiv,
     rsub,
-    set_logging_level,
-    setup_tensor,
     sub,
     tensor,
     using_config,
@@ -43,11 +41,8 @@ from torch.types import (
     type_np2torch,
     type_torch2np,
 )
+from torch.utils import set_logging_level
 
-# set tensor
-setup_tensor()
-
-# set logging at default level(INFO)
 set_logging_level("INFO")
 
 __all__ = [
