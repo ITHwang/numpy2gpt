@@ -176,6 +176,20 @@ class Tensor:
 
         self._data = self._data.astype(data_type, copy=False)
 
+    @property
+    def is_leaf(self) -> bool:
+        """Check if the tensor is a leaf tensor.
+
+        https://pytorch.org/docs/stable/generated/torch.Tensor.is_leaf.html
+        """
+        if self.requires_grad:
+            if self.grad_fn:
+                return False
+            else:
+                return True
+        else:
+            return True
+
     def size(self) -> Size:
         item_: np.ndarray = self._data
 

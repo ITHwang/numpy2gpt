@@ -13,7 +13,13 @@
 </p>
 
 # Overview
-- An educational implementation of GPT from scratch using numpy, heavily inspired by [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3), [nanoGPT](https://github.com/karpathy/nanoGPT), and [pytorch](https://github.com/pytorch/pytorch).
+- An educational implementation of GPT from scratch using numpy.
+- Besides [pytorch](https://github.com/pytorch/pytorch), this project is heavily inspired by:
+  - [deep-learning-from-scratch-3](https://github.com/oreilly-japan/deep-learning-from-scratch-3)
+  - [tinygrad](https://github.com/tinygrad/tinygrad)
+  - [micrograd](https://github.com/karpathy/micrograd)
+  - [nanograd](https://github.com/PABannier/nanograd)
+  - [nanoGPT](https://github.com/karpathy/nanoGPT)
 
 # Concepts
 

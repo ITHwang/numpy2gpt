@@ -746,3 +746,37 @@ def test_convert_to_numpy_force_true() -> None:
     # Modify the tensor's data and check the copied array remains unchanged
     t._data[1] = 888
     assert np_array_copy[1] == 20
+
+
+def test_is_leaf() -> None:
+    """Test the is_leaf property of the Tensor class."""
+    # Case 1: Tensor created by user, requires_grad=False (default)
+    t1 = torch.tensor([1.0, 2.0])
+    assert t1.is_leaf is True, "Case 1 Failed: requires_grad=False should be leaf"
+
+    # Case 2: Tensor created by user, requires_grad=True
+    t2 = torch.tensor([1.0, 2.0], requires_grad=True)
+    assert t2.is_leaf is True, "Case 2 Failed: requires_grad=True should be leaf"
+
+    # Case 3: Tensor resulting from an operation on a tensor requiring grad
+    t3_base = torch.tensor([1.0, 2.0], requires_grad=True)
+    t3_result = t3_base * 2
+    assert isinstance(t3_result, Tensor)
+    assert t3_result.is_leaf is False, (
+        "Case 3 Failed: Result of op with requires_grad should not be leaf"
+    )
+
+    # Case 4: Tensor resulting from an operation within no_grad context
+    t4_base = torch.tensor([1.0, 2.0], requires_grad=True)
+    with torch.no_grad():
+        t4_result = t4_base * 2
+    assert isinstance(t4_result, Tensor)
+    assert t4_result.is_leaf is True, (
+        "Case 4 Failed: Result of op in no_grad should be leaf"
+    )
+
+    # Case 5: Detached tensor
+    t5_base = torch.tensor([1.0, 2.0], requires_grad=True)
+    t5_op = t5_base * 2
+    t5_detached: Tensor = t5_op.detach()  # type: ignore
+    assert t5_detached.is_leaf is True, "Case 5 Failed: Detached tensor should be leaf"
