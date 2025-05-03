@@ -53,7 +53,7 @@ def test_sphere_function_backward() -> None:
     z = sphere(x, y)
 
     # Backward pass (automatic gradient)
-    z.backward()
+    z.backward(torch.ones_like(z))
 
     # Automatic gradients
     dx_automatic = x.grad
@@ -82,7 +82,7 @@ def test_goldstein_function_backward() -> None:
     z = goldstein(x, y)
 
     # Backward pass (automatic gradient)
-    z.backward()
+    z.backward(torch.ones_like(z))
 
     # Automatic gradients
     dx_automatic = x.grad
@@ -111,7 +111,7 @@ def test_matyas_function_backward() -> None:
     z = matyas(x, y)
 
     # Backward pass (analytical gradient)
-    z.backward()
+    z.backward(torch.ones_like(z))
 
     # Automatic gradients
     dx_automatic = x.grad

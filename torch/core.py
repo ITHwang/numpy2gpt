@@ -7,7 +7,6 @@ from typing import (
     ContextManager,
     Generator,
     Iterator,
-    overload,
 )
 
 import numpy as np
@@ -387,10 +386,10 @@ class Tensor:
         self.requires_grad = requires_grad
 
     def __len__(self) -> int:
-        if not isinstance(self._data, Size):
-            raise TypeError("len() of unsized object")
-
-        return len(self._data)
+        if self.ndim == 0:
+            raise TypeError(f"The tensor is a scalar: {self}")
+        else:
+            return len(self._data)
 
     def __repr__(self) -> str:
         p = str(self._data).replace("\n", "\n" + " " * 7)
@@ -586,7 +585,10 @@ class Tensor:
             return str(self.dtype)
 
     def backward(
-        self, retain_graph: bool | None = None, create_graph: bool = False
+        self,
+        gradient: Tensor | None = None,
+        retain_graph: bool | None = None,
+        create_graph: bool = False,
     ) -> None:
         """Backward propagation.
 
@@ -599,6 +601,7 @@ class Tensor:
         See: https://pytorch.org/docs/stable/generated/torch.Tensor.backward.html#torch-tensor-backward
 
         Args:
+            gradient: The gradient of the function being differentiated w.r.t. self. This argument can be omitted if self is a scalar.
             retain_graph: Whether to keep the computational graph of the output tensors
                 In most cases, we don't need to keep the gradients in the middle of the backpropagation.
                 We finally use only the gradient of the "first" input tensor.(dy/dx)
@@ -614,9 +617,18 @@ class Tensor:
 
         if self.grad is None:
             if self.requires_grad:
-                # if the gradient is not set, set it to 1.0
-                # this is because dy/dy = 1.0
-                self.grad = ones_like(self, dtype=self.dtype)
+                # if gradient is provided, use it as the gradient of self
+                if gradient is None:
+                    # if self is a scalar, the gradient is 1.0(dy/dy = 1.0)
+                    # else, raise an error
+                    if self.ndim == 0:
+                        self.grad = ones_like(self, dtype=self.dtype)
+                    else:
+                        raise RuntimeError(
+                            "grad can be implicitly created only for scalar outputs"
+                        )
+                else:
+                    self.grad = gradient
             elif self._creator is None:
                 # The final output tensor of the computational graph does not require grad.
                 raise RuntimeError(
@@ -659,13 +671,13 @@ class Tensor:
                 output_tensor = output()
 
                 assert output_tensor is not None, (
-                    f"One of the outputs of the function {f} is None."
+                    f"The outputs of the function {f} must not be None."
                 )
 
                 gy = output_tensor.grad
 
                 assert gy is not None, (
-                    f"The gradient of the output of the function {f} is None."
+                    f"The gradient of the output {output_tensor} of the function {f} must not be None."
                 )
 
                 gys.append(gy)

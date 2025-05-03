@@ -174,6 +174,32 @@ def test_tensor_method_ones_like() -> None:
 
 
 # ==================================================
+# Tensor Magic Methods
+# ==================================================
+
+
+def test_tensor_instance_method_len() -> None:
+    """Test the __len__ magic method of the Tensor class."""
+    # Case 1: Scalar tensor (0-dimensional)
+    t0 = torch.tensor(5.0)
+    with pytest.raises(TypeError) as excinfo:
+        len(t0)
+    assert "The tensor is a scalar" in str(excinfo.value)
+
+    # Case 2: 1-dimensional tensor
+    t1 = torch.tensor([1.0, 2.0, 3.0])
+    assert len(t1) == 3
+
+    # Case 3: 2-dimensional tensor
+    t2 = torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]])
+    assert len(t2) == 4  # Length is the size of the first dimension
+
+    # Case 4: 3-dimensional tensor
+    t3 = torch.tensor([[[1, 2]], [[3, 4]]])
+    assert len(t3) == 2  # Length is the size of the first dimension
+
+
+# ==================================================
 # Tensor Properties
 # ==================================================
 
@@ -304,7 +330,7 @@ def test_tensor_torch_method_add() -> None:
     assert y.creator is not None
 
     # Backward pass
-    y.backward()
+    y.backward(torch.ones_like(y))
 
     # Check gradients
     assert x0.grad is not None
@@ -442,7 +468,7 @@ def test_tensor_instance_method_add() -> None:
     assert y.creator is not None
 
     # Backward pass
-    y.backward()
+    y.backward(torch.ones_like(y))
 
     # Check gradients
     assert x0.grad is not None
@@ -572,7 +598,7 @@ def test_tensor_magic_method_add() -> None:
 
     y = x0 + x1
 
-    y.backward()
+    y.backward(torch.ones_like(y))
 
     assert x0.grad is not None
     assert x1.grad is not None
@@ -589,7 +615,7 @@ def test_tensor_magic_method_radd() -> None:
 
     y = np.array(2.0) + x0
 
-    y.backward()
+    y.backward(torch.ones_like(y))
 
     assert x0.grad is not None
     assert np.allclose(x0.grad.numpy(), expected_grad)
@@ -980,6 +1006,60 @@ def test_tensor_instance_method_dim() -> None:
 # ==================================================
 
 
+def test_tensor_backpropagation_scalar_no_gradient() -> None:
+    """Test backward() on scalar output without providing gradient initializes output grad to 1.0."""
+    # Case 1 (Revisited): Scalar output, backward() without gradient argument
+    inp = torch.tensor(5.0, dtype=torch.float32, requires_grad=True)
+    s_out = inp * 2
+    s_out.backward()  # Should implicitly use grad=1.0 for the scalar output
+    # We check the input grad to infer correct output grad initialization
+    # input grad = output grad * d_output/d_input = 1.0 * 2 = 2.0
+    assert inp.grad is not None
+    assert np.allclose(inp.grad.numpy(), 2.0)
+
+
+def test_tensor_backpropagation_nonscalar_no_gradient_error() -> None:
+    """Test backward() on non-scalar output without providing gradient raises RuntimeError."""
+    # Case 2: Non-scalar tensor, no gradient provided -> RuntimeError
+    non_scalar_tensor = torch.tensor(
+        [1.0, 2.0], dtype=torch.float32, requires_grad=True
+    )
+    output_non_scalar = non_scalar_tensor * 2
+    with pytest.raises(RuntimeError) as excinfo:
+        output_non_scalar.backward()
+    assert "grad can be implicitly created only for scalar outputs" in str(
+        excinfo.value
+    )
+
+
+def test_tensor_backpropagation_scalar_with_gradient() -> None:
+    """Test backward() on scalar output when a gradient is provided."""
+    # Case 3: Scalar tensor, gradient provided
+    scalar_tensor_2 = torch.tensor(3.0, dtype=torch.float32, requires_grad=True)
+    output_scalar_2 = scalar_tensor_2 * 2
+    provided_grad_scalar = torch.tensor(10.0, dtype=torch.float32)
+
+    output_scalar_2.backward(gradient=provided_grad_scalar)
+    # input grad = output grad * d_output/d_input = 10.0 * 2 = 20.0
+
+    assert scalar_tensor_2.grad is not None
+    assert np.allclose(scalar_tensor_2.grad.numpy(), 20.0)
+
+
+def test_tensor_backpropagation_nonscalar_with_gradient() -> None:
+    """Test backward() on non-scalar output when a gradient is provided."""
+    # Case 4: Non-scalar tensor, gradient provided
+    non_scalar_tensor_2 = torch.tensor(
+        [1.0, 2.0], dtype=torch.float32, requires_grad=True
+    )
+    output_non_scalar_2 = non_scalar_tensor_2 * 2
+    provided_grad_non_scalar = torch.tensor([5.0, 6.0], dtype=torch.float32)
+    output_non_scalar_2.backward(gradient=provided_grad_non_scalar)
+    # input grad = output grad * d_output/d_input = [5.0, 6.0] * 2 = [10.0, 12.0]
+    assert non_scalar_tensor_2.grad is not None
+    assert np.allclose(non_scalar_tensor_2.grad.numpy(), [10.0, 12.0])
+
+
 def test_tensor_backpropagation_multi_branch() -> None:
     """Test the backward propagation of a function with multiple branches.
 
@@ -1163,21 +1243,21 @@ def test_tensor_higher_order_derivatives() -> None:
     # --- 1st derivative ---
     # Gradient for backward() on non-scalar output
     x.grad = None
-    y.backward(create_graph=True)
+    y.backward(torch.ones_like(y), create_graph=True)
     y_prime = x.grad
     assert y_prime is not None
 
     # --- 2nd derivative ---
     x.grad = None
     # Differentiate y' w.r.t x
-    y_prime.backward(create_graph=True)
+    y_prime.backward(torch.ones_like(y_prime), create_graph=True)
     y_double_prime = x.grad
     assert y_double_prime is not None
 
     # --- 3rd derivative ---
     x.grad = None
     # Differentiate y'' w.r.t x
-    y_double_prime.backward(create_graph=False)
+    y_double_prime.backward(torch.ones_like(y_double_prime), create_graph=False)
     y_triple_prime = x.grad
     assert y_triple_prime is not None
 

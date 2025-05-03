@@ -204,6 +204,7 @@ print(x.grad)  # Access gradients
     ...
     ```
 
+- In `backward(self, gradient: Tensor | None = None, ...)`, `self` should be a scalar, or receive a gradient as the argument. For more details, see [Deep-dive into Autograd](./docs/deep-dive-into-autograd.md).
 
 
 ## 2. Neural Network Visualization
