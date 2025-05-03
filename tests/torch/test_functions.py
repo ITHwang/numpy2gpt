@@ -9,7 +9,6 @@ def test_square_backward() -> None:
     """Test the backward propagation of the square function."""
     x = torch.tensor(np.array(2.0), requires_grad=True)
     y = torch.square(x)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -29,7 +28,6 @@ def test_exp_backward() -> None:
     """Test the backward propagation of the exp function."""
     x = torch.tensor(np.array(1.0), requires_grad=True)
     y = torch.exp(x)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -136,7 +134,6 @@ def test_sin_backward() -> None:
     """Test the backward propagation of the sin function."""
     x = torch.tensor(np.array(1.0), requires_grad=True)
     y = torch.sin(x)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -156,7 +153,6 @@ def test_cos_backward() -> None:
     """Test the backward propagation of the cos function."""
     x = torch.tensor(np.array(1.0), requires_grad=True)
     y = torch.cos(x)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -176,7 +172,6 @@ def test_tanh_backward() -> None:
     """Test the backward propagation of the tanh function."""
     x = torch.tensor(np.array(5.0), requires_grad=True)
     y = torch.tanh(x)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 

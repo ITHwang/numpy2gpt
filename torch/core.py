@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import contextlib
 import copy
-import sys
 import weakref
-from typing import ContextManager, Generator, Iterator, Literal, Sized
+from typing import (
+    ContextManager,
+    Generator,
+    Iterator,
+    overload,
+)
 
 import numpy as np
-from loguru import logger
 
 from .priority_queue import PriorityQueue
 from .types import (
@@ -23,7 +26,7 @@ from .types import (
 
 
 class Function:
-    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> tuple[Tensor, ...]:
         """Do forward propagation.
         self.generation: the generation of the function.
             A function gets inputs and outputs.
@@ -77,19 +80,18 @@ class Function:
                 weakref.ref(output) for output in outputs
             )
 
-        return outputs if len(outputs) > 1 else outputs[0]
+        return outputs
 
     def forward(self, *xs: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
         raise NotImplementedError
 
-    def backward(self, *gys: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
+    def backward(self, *gys: Tensor) -> Tensor | tuple[Tensor, ...]:
         raise NotImplementedError
 
 
 class Add(Function):
     def forward(self, *xs: np.ndarray) -> np.ndarray:
-        if len(xs) != 2:
-            raise ValueError("Add must take two arguments")
+        assert len(xs) == 2, "Add must take two arguments"
 
         x0, x1 = xs
         y = x0 + x1
@@ -97,8 +99,7 @@ class Add(Function):
         return y
 
     def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
-        if len(gys) != 1:
-            raise ValueError("Add must take one argument")
+        assert len(gys) == 1, "Add must take one argument"
 
         gy = gys[0]
 
@@ -106,41 +107,55 @@ class Add(Function):
 
 
 class Mul(Function):
-    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        assert len(xs) == 2, "Mul must take two arguments"
+
+        x0, x1 = xs
         y = x0 * x1
 
         return y
 
-    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+    def backward(self, *gys: Tensor) -> tuple[Tensor, ...]:
+        assert len(gys) == 1, "Mul must take one argument"
+
+        gy = gys[0]
         x0, x1 = self.inputs
         gx0 = gy * x1
         gx1 = gy * x0
-
-        assert isinstance(gx0, Tensor), f"gx0 is not a Tensor: {type(gx0)}"
-        assert isinstance(gx1, Tensor), f"gx1 is not a Tensor: {type(gx1)}"
 
         return gx0, gx1
 
 
 class Neg(Function):
-    def forward(self, x: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        assert len(xs) == 1, "Neg must take one argument"
+
+        x = xs[0]
+
         return -x
 
-    def backward(self, gy: Tensor) -> Tensor:
-        return -gy  # type: ignore
+    def backward(self, *gys: Tensor) -> Tensor:
+        assert len(gys) == 1, "Neg must take one argument"
+
+        gy = gys[0]
+
+        return -gy
 
 
 class Sub(Function):
-    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        assert len(xs) == 2, "Sub must take two arguments"
+
+        x0, x1 = xs
+
         return x0 - x1
 
-    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
-        x0, x1 = self.inputs
+    def backward(self, *gys: Tensor) -> tuple[Tensor, ...]:
+        assert len(gys) == 1, "Sub must take one argument"
+
+        gy = gys[0]
         gx0 = gy
         gx1 = -gy
-
-        assert isinstance(gx0, Tensor), f"gx0 is not a Tensor: {type(gx0)}"
-        assert isinstance(gx1, Tensor), f"gx1 is not a Tensor: {type(gx1)}"
 
         return gx0, gx1
 
@@ -159,17 +174,21 @@ class Div(Function):
     For simplicity, we only implement true division with the '/' operator.
     """
 
-    def forward(self, x0: np.ndarray, x1: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        assert len(xs) == 2, "Div must take two arguments"
+
+        x0, x1 = xs
+
         return x0 / x1
 
-    def backward(self, gy: Tensor) -> tuple[Tensor, Tensor]:
+    def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
+        assert len(gys) == 1, "Div must take one argument"
+
+        gy = gys[0]
         x0, x1 = self.inputs
 
         gx0 = gy / x1
         gx1 = -gy * x0 / x1**2
-
-        assert isinstance(gx0, Tensor), f"gx0 is not a Tensor: {type(gx0)}"
-        assert isinstance(gx1, Tensor), f"gx1 is not a Tensor: {type(gx1)}"
 
         return gx0, gx1
 
@@ -178,70 +197,91 @@ class Pow(Function):
     def __init__(self, c: int | float) -> None:
         self.c = c
 
-    def forward(self, x: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray) -> np.ndarray:
+        assert len(xs) == 1, "Pow must take one argument"
+
+        x = xs[0]
+
         return x**self.c
 
-    def backward(self, gy: Tensor) -> Tensor:
+    def backward(self, *gys: Tensor) -> Tensor:
+        assert len(gys) == 1, "Pow must take one argument"
+
+        gy = gys[0]
         x = self.inputs[0]
-        gx: Tensor = self.c * x ** (self.c - 1) * gy  # type: ignore
+        gx: Tensor = self.c * x ** (self.c - 1) * gy
 
         return gx
 
 
-def add(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
+def add(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.add.html"""
+    result = Add()(x0, x1)
 
-    return Add()(x0, x1)
+    assert len(result) == 1, "Add must return a single Tensor"
+
+    return result[0]
 
 
-def mul(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
+def mul(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.mul.html"""
+    result = Mul()(x0, x1)
 
-    return Mul()(x0, x1)
+    assert len(result) == 1, "Mul must return a single Tensor"
+
+    return result[0]
 
 
-def neg(x: INPUT_TYPE | Tensor) -> Tensor | tuple[Tensor, ...]:
+def neg(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.neg.html"""
+    result = Neg()(x)
 
-    return Neg()(x)
+    assert len(result) == 1, "Neg must return a single Tensor"
+
+    return result[0]
 
 
-def sub(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
+def sub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.sub.html"""
+    result = Sub()(x0, x1)
 
-    return Sub()(x0, x1)
+    assert len(result) == 1, "Sub must return a single Tensor"
 
-
-def rsub(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    return Sub()(x1, x0)
+    return result[0]
 
 
-def div(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
+def rsub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
+    result = Sub()(x1, x0)
+
+    assert len(result) == 1, "rsub must return a single Tensor"
+
+    return result[0]
+
+
+def div(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.div.html"""
+    result = Div()(x0, x1)
 
-    return Div()(x0, x1)
+    assert len(result) == 1, "div must return a single Tensor"
 
-
-def rdiv(
-    x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor
-) -> Tensor | tuple[Tensor, ...]:
-    return Div()(x1, x0)
+    return result[0]
 
 
-def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor | tuple[Tensor, ...]:
+def rdiv(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
+    result = Div()(x1, x0)
+
+    assert len(result) == 1, "rdiv must return a single Tensor"
+
+    return result[0]
+
+
+def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.pow.html"""
+    result = Pow(c)(x)
 
-    return Pow(c)(x)
+    assert len(result) == 1, "pow must return a single Tensor"
+
+    return result[0]
 
 
 class Tensor:
@@ -254,6 +294,7 @@ class Tensor:
     See: https://github.com/pytorch/pytorch/blob/main/torch/csrc/autograd/variable.h
     """
 
+    # See: https://pytorch.org/docs/stable/tensors.html
     __add__ = add
     __radd__ = add
     __mul__ = mul
@@ -346,7 +387,7 @@ class Tensor:
         self.requires_grad = requires_grad
 
     def __len__(self) -> int:
-        if not isinstance(self._data, Sized):
+        if not isinstance(self._data, Size):
             raise TypeError("len() of unsized object")
 
         return len(self._data)
@@ -613,7 +654,21 @@ class Tensor:
 
             # get gradients of outputs
             # NOTE: f.outputs is a tuple of weakref.ref[Tensor]
-            gys = [output().grad for output in f.outputs]  # type: ignore
+            gys = []
+            for output in f.outputs:
+                output_tensor = output()
+
+                assert output_tensor is not None, (
+                    f"One of the outputs of the function {f} is None."
+                )
+
+                gy = output_tensor.grad
+
+                assert gy is not None, (
+                    f"The gradient of the output of the function {f} is None."
+                )
+
+                gys.append(gy)
 
             # NOTE: f.backward(*gys) calls Function.__call__() which refers to the value of `enable_backprop`.
             # That's why we need to set the value of `enable_backprop` here.
@@ -639,7 +694,13 @@ class Tensor:
             if not retain_graph:
                 for output in f.outputs:
                     # NOTE: output is a weakref.ref[Tensor]
-                    output().grad = None  # type: ignore
+                    output_tensor = output()
+
+                    assert output_tensor is not None, (
+                        f"One of the outputs of the function {f} is None."
+                    )
+
+                    output_tensor.grad = None
 
 
 class Config:

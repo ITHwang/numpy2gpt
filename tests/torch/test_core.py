@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 import torch
-from torch import Tensor
 
 from .utils import numerical_diff
 
@@ -74,7 +73,6 @@ def test_tensor_method_ones() -> None:
     """Test the `ones` function for creating tensors."""
     # Test basic creation
     t1 = torch.ones(2, 3)
-    assert isinstance(t1, Tensor)
     assert t1.shape == torch.Size(2, 3)
     # Default dtype might vary, but check it's a float type if no dtype specified
     assert t1.dtype in (torch.float32, torch.float64)
@@ -83,7 +81,6 @@ def test_tensor_method_ones() -> None:
 
     # Test with specified dtype (integer)
     t2 = torch.ones(4, dtype=torch.int32)
-    assert isinstance(t2, Tensor)
     assert t2.shape == torch.Size(
         4,
     )
@@ -93,7 +90,6 @@ def test_tensor_method_ones() -> None:
 
     # Test with specified dtype (float) and requires_grad
     t3 = torch.ones(1, 2, dtype=torch.float32, requires_grad=True)
-    assert isinstance(t3, Tensor)
     assert t3.shape == torch.Size(1, 2)
     assert t3.dtype == torch.float32
     assert np.array_equal(t3._data, np.ones((1, 2), dtype=np.float32))
@@ -101,7 +97,6 @@ def test_tensor_method_ones() -> None:
 
     # Test with name
     t4 = torch.ones(5, name="test_ones_tensor")
-    assert isinstance(t4, Tensor)
     assert t4.shape == torch.Size(
         5,
     )
@@ -119,7 +114,6 @@ def test_tensor_method_ones_like() -> None:
 
     # Basic test: inherit shape, dtype, requires_grad
     t1 = torch.ones_like(input1)
-    assert isinstance(t1, Tensor)
     assert t1.shape == input1.shape
     assert t1.dtype == input1.dtype
     # ones_like should default requires_grad to False unless overridden
@@ -128,7 +122,6 @@ def test_tensor_method_ones_like() -> None:
 
     # Test overriding dtype (to int)
     t2 = torch.ones_like(input1, dtype=torch.int64)
-    assert isinstance(t2, Tensor)
     assert t2.shape == input1.shape
     assert t2.dtype == torch.int64
     assert t2.requires_grad is False
@@ -136,7 +129,6 @@ def test_tensor_method_ones_like() -> None:
 
     # Test overriding requires_grad
     t3 = torch.ones_like(input1, requires_grad=True)
-    assert isinstance(t3, Tensor)
     assert t3.shape == input1.shape
     assert t3.dtype == input1.dtype
     assert t3.requires_grad is True
@@ -144,7 +136,6 @@ def test_tensor_method_ones_like() -> None:
 
     # Test overriding dtype and requires_grad
     t4 = torch.ones_like(input1, dtype=torch.float64, requires_grad=True)
-    assert isinstance(t4, Tensor)
     assert t4.shape == input1.shape
     assert t4.dtype == torch.float64
     assert t4.requires_grad is True
@@ -152,7 +143,6 @@ def test_tensor_method_ones_like() -> None:
 
     # Test with name
     t5 = torch.ones_like(input1, name="test_ones_like")
-    assert isinstance(t5, Tensor)
     assert t5.shape == input1.shape
     assert t5.dtype == input1.dtype
     assert t5.requires_grad is False
@@ -166,7 +156,6 @@ def test_tensor_method_ones_like() -> None:
     # Test with integer input tensor
     input_int = torch.tensor([5, 6], dtype=torch.int32)
     t6 = torch.ones_like(input_int)
-    assert isinstance(t6, Tensor)
     assert t6.shape == input_int.shape
     assert t6.dtype == input_int.dtype
     assert t6.requires_grad is False  # Cannot require grad for int
@@ -178,7 +167,6 @@ def test_tensor_method_ones_like() -> None:
 
     # Test overriding requires_grad on int input with float dtype (should work)
     t7 = torch.ones_like(input_int, dtype=torch.float32, requires_grad=True)
-    assert isinstance(t7, Tensor)
     assert t7.shape == input_int.shape
     assert t7.dtype == torch.float32
     assert t7.requires_grad is True
@@ -203,7 +191,6 @@ def test_is_leaf() -> None:
     # Case 3: Tensor resulting from an operation on a tensor requiring grad
     t3_base = torch.tensor([1.0, 2.0], requires_grad=True)
     t3_result = t3_base * 2
-    assert isinstance(t3_result, Tensor)
     assert t3_result.is_leaf is False, (
         "Case 3 Failed: Result of op with requires_grad should not be leaf"
     )
@@ -212,7 +199,6 @@ def test_is_leaf() -> None:
     t4_base = torch.tensor([1.0, 2.0], requires_grad=True)
     with torch.no_grad():
         t4_result = t4_base * 2
-    assert isinstance(t4_result, Tensor)
     assert t4_result.is_leaf is True, (
         "Case 4 Failed: Result of op in no_grad should be leaf"
     )
@@ -220,7 +206,7 @@ def test_is_leaf() -> None:
     # Case 5: Detached tensor
     t5_base = torch.tensor([1.0, 2.0], requires_grad=True)
     t5_op = t5_base * 2
-    t5_detached: Tensor = t5_op.detach()  # type: ignore
+    t5_detached: torch.Tensor = t5_op.detach()
     assert t5_detached.is_leaf is True, "Case 5 Failed: Detached tensor should be leaf"
 
 
@@ -230,11 +216,8 @@ def test_tensor_property_data_getter() -> None:
     x = torch.tensor(x_data, requires_grad=True)
     y = torch.square(x)  # Create some history
 
-    assert isinstance(y, Tensor)
-
     data_tensor = y.data
 
-    assert isinstance(data_tensor, Tensor)
     # The data property should return a detached tensor
     assert data_tensor.requires_grad is False
     assert data_tensor.creator is None
@@ -314,7 +297,6 @@ def test_tensor_torch_method_add() -> None:
 
     # Forward pass using the method
     y = torch.add(x0, x1)
-    assert isinstance(y, torch.Tensor)
 
     # Check forward result
     assert np.allclose(y.numpy(), expected_sum)
@@ -336,7 +318,6 @@ def test_tensor_torch_method_sub() -> None:
     x = torch.tensor(np.array(100.0), requires_grad=True)
     y = torch.sub(x, np.array(200.0))
 
-    assert isinstance(y, torch.Tensor)
     y.backward()
 
     # Automatic gradient
@@ -357,7 +338,6 @@ def test_tensor_torch_method_mul() -> None:
     x1 = torch.tensor(np.array(3.0), requires_grad=True)
 
     y = torch.mul(x0, x1)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -384,7 +364,6 @@ def test_tensor_torch_method_div() -> None:
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
 
     y = torch.div(x0, x1)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -404,7 +383,6 @@ def test_tensor_torch_method_neg() -> None:
     """Test `torch.neg(tensor)`."""
     x = torch.tensor(np.array(1.0), requires_grad=True)
     y = torch.neg(x)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -424,7 +402,6 @@ def test_tensor_torch_method_pow() -> None:
     """Test `torch.pow(tensor, c)`."""
     x = torch.tensor(np.array(2.0), requires_grad=True)
     y = torch.pow(x, 3)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -458,7 +435,6 @@ def test_tensor_instance_method_add() -> None:
 
     # Forward pass using the method
     y = x0.add(x1)
-    assert isinstance(y, torch.Tensor)
 
     # Check forward result
     assert np.allclose(y.numpy(), expected_sum)
@@ -480,7 +456,6 @@ def test_tensor_instance_method_sub() -> None:
     x = torch.tensor(np.array(100.0), requires_grad=True)
     y = x.sub(np.array(200.0))
 
-    assert isinstance(y, torch.Tensor)
     y.backward()
 
     # Automatic gradient
@@ -501,7 +476,6 @@ def test_tensor_instance_method_mul() -> None:
     x1 = torch.tensor(np.array(3.0), requires_grad=True)
 
     y = x0.mul(x1)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -528,7 +502,6 @@ def test_tensor_instance_method_div() -> None:
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
 
     y = x0.div(x1)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -548,7 +521,6 @@ def test_tensor_instance_method_neg() -> None:
     """Test `tensor.neg()`."""
     x = torch.tensor(np.array(1.0), requires_grad=True)
     y = x.neg()
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -568,7 +540,6 @@ def test_tensor_instance_method_pow() -> None:
     """Test `tensor.pow(c)`."""
     x = torch.tensor(np.array(2.0), requires_grad=True)
     y = x.pow(3)
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -600,7 +571,6 @@ def test_tensor_magic_method_add() -> None:
     x1 = torch.tensor(x1_data, requires_grad=True)
 
     y = x0 + x1
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -618,7 +588,6 @@ def test_tensor_magic_method_radd() -> None:
     x0 = torch.tensor(x0_data, requires_grad=True)
 
     y = np.array(2.0) + x0
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -668,7 +637,6 @@ def test_tensor_magic_method_mul() -> None:
     x1 = torch.tensor(np.array(3.0), requires_grad=True)
 
     y = x0 * x1
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -694,7 +662,6 @@ def test_tensor_magic_method_rmul() -> None:
     x0 = torch.tensor(np.array(2.0), requires_grad=True)
 
     y = np.array(2.0) * x0
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -716,7 +683,6 @@ def test_tensor_magic_method_div() -> None:
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
 
     y = x0 / x1
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -736,7 +702,6 @@ def test_tensor_magic_method_rdiv() -> None:
     """Test `some numeric / tensor`."""
     x = torch.tensor(np.array(2.0), requires_grad=True)
     y = np.array(4) / x
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -756,7 +721,6 @@ def test_tensor_magic_method_neg() -> None:
     """Test `-tensor`."""
     x = torch.tensor(np.array(1.0), requires_grad=True)
     y = -x
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -776,7 +740,6 @@ def test_tensor_magic_method_pow() -> None:
     """Test `tensor ** c`."""
     x = torch.tensor(np.array(2.0), requires_grad=True)
     y = x**3
-    assert isinstance(y, torch.Tensor)
 
     y.backward()
 
@@ -880,12 +843,9 @@ def test_tensor_instance_method_detach() -> None:
     x = torch.tensor(x_data, requires_grad=True)
     y = torch.square(x)  # y requires grad and has a creator
 
-    assert isinstance(y, Tensor)
-
     detached_y = y.detach()
 
     # Check detached tensor properties
-    assert isinstance(detached_y, Tensor)
     assert detached_y.requires_grad is False
     assert detached_y.creator is None
     assert detached_y.grad_fn is None
@@ -932,7 +892,6 @@ def test_tensor_instance_method_numpy_force_false() -> None:
 
     np_array = t.numpy()  # force=False by default
 
-    assert isinstance(np_array, np.ndarray)
     assert np.array_equal(np_array, original_data)
     # Check for memory sharing
     assert np_array is t._data  # Should return the exact same object
@@ -949,7 +908,6 @@ def test_tensor_instance_method_numpy_force_true() -> None:
 
     np_array_copy = t.numpy(force=True)
 
-    assert isinstance(np_array_copy, np.ndarray)
     assert np.array_equal(np_array_copy, original_data)
     # Check for NO memory sharing
     assert np_array_copy is not t._data
@@ -978,7 +936,7 @@ def test_tensor_instance_method_type() -> None:
     t_float32 = t_orig.type(torch.float32)
 
     # Should be a new tensor instance (even if data shared)
-    assert isinstance(t_float32, Tensor)
+    assert isinstance(t_float32, torch.Tensor)
     assert t_float32 is not t_orig
     assert t_float32.dtype == torch.float32
     assert t_float32.type() == "torch.float32"
@@ -988,7 +946,7 @@ def test_tensor_instance_method_type() -> None:
 
     # Cast to float32 (expected to return the same tensor object)
     t_float32_2 = t_float32.type(torch.float32)
-    assert isinstance(t_float32_2, Tensor)
+    assert isinstance(t_float32_2, torch.Tensor)
     assert t_float32_2 is t_float32
     assert id(t_float32_2._data) == original_data_ptr
 
@@ -1033,17 +991,9 @@ def test_tensor_backpropagation_multi_branch() -> None:
     x = torch.tensor(np.array(5.0), requires_grad=True)
 
     a = torch.square(x)
-    assert isinstance(a, Tensor)
-
     b = torch.square(a)
-    assert isinstance(b, Tensor)
-
     c = torch.square(a)
-    assert isinstance(c, Tensor)
-
     y = torch.add(b, c)
-    assert isinstance(y, Tensor)
-
     y.backward()
 
     # Automatic gradient
@@ -1052,7 +1002,6 @@ def test_tensor_backpropagation_multi_branch() -> None:
     # Numerical gradient
     grad_b, grad_c = np.array(1), np.array(1)
 
-    assert isinstance(a, torch.Tensor)
     grad_a = (
         numerical_diff(torch.square, a) * grad_b
         + numerical_diff(torch.square, a) * grad_c
@@ -1079,10 +1028,7 @@ def test_tensor_backpropagation_retain_graph(retain_graph: bool) -> None:
     x1 = torch.tensor(np.array(2.0), requires_grad=True)
 
     t = torch.add(x0, x1)
-    assert isinstance(t, Tensor)
-
     y = torch.square(t)
-    assert isinstance(y, Tensor)
 
     y.backward(retain_graph=retain_graph)
 
@@ -1149,15 +1095,11 @@ def test_tensor_backpropagation_no_grad_creator_check() -> None:
     with torch.no_grad():
         y = torch.square(x)
 
-    assert isinstance(y, torch.Tensor)
-
     # When no_grad is used, the creator is None
     assert y.creator is None
 
     # Now compute with gradients enabled
     y = torch.square(x)
-    assert isinstance(y, torch.Tensor)
-
     y.backward()
 
     # Gradient should be computed
@@ -1191,7 +1133,6 @@ def test_tensor_backpropagation_without_requires_grad_error() -> None:
     # This should work because c has a creator (Function) even though requires_grad=False
     # The error about "This is the case that is not considered yet" won't be raised
     # because we're not hitting that case - no_grad() disables the creation of grad_fn
-    assert isinstance(c, Tensor)
     assert c.grad_fn is None
 
     with pytest.raises(RuntimeError) as excinfo:
@@ -1218,7 +1159,6 @@ def test_tensor_higher_order_derivatives() -> None:
 
     # --- 0th derivative ---
     y = torch.sin(x)
-    assert isinstance(y, Tensor)
 
     # --- 1st derivative ---
     # Gradient for backward() on non-scalar output
