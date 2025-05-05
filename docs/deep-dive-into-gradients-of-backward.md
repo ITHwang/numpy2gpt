@@ -17,17 +17,13 @@
 - The method then traverses the computational graph backward, applying the chain rule of calculus:
 
 $$
-\frac{\partial y}{\partial x}
-= \Bigl(\frac{\partial y}{\partial b}\frac{\partial b}{\partial a}\Bigr)\frac{\partial a}{\partial x}
-\tag{1}
+\frac{\partial y}{\partial x}=\Bigl(\frac{\partial y}{\partial b}\frac{\partial b}{\partial a}\Bigr)\frac{\partial a}{\partial x}\tag{1}
 $$
 
 - But **why not apply the chain rule in the forward direction?** Mathematically, both approaches seem equivalent:
 
 $$
-\frac{\partial y}{\partial x}
-= \frac{\partial y}{\partial b}\Bigl(\frac{\partial b}{\partial a}\frac{\partial a}{\partial x}\Bigr)
-\tag{2}
+\frac{\partial y}{\partial x}=\frac{\partial y}{\partial b}\Bigl(\frac{\partial b}{\partial a}\frac{\partial a}{\partial x}\Bigr)\tag{2}
 $$
 
 ## Forward Mode and Reverse Mode of Automatic Differentiation
@@ -52,9 +48,7 @@ $$
 - The JVP is calculated by multiplying the Jacobian $ J $ by a vector $ v\in\mathbb{R}^n $. Often, $v$ is chosen as a standard basis vector (like a one-hot vector) to extract a single column of the Jacobian:
 
 $$
-J\,v =
-\begin{bmatrix}
-\dfrac{\partial y_{1}}{\partial x_{1}} & \cdots & \dfrac{\partial y_{1}}{\partial x_{n}} \\
+J\,v=\begin{bmatrix}\dfrac{\partial y_{1}}{\partial x_{1}} & \cdots & \dfrac{\partial y_{1}}{\partial x_{n}} \\
 \vdots & \ddots & \vdots \\
 \dfrac{\partial y_{m}}{\partial x_{1}} & \cdots & \dfrac{\partial y_{m}}{\partial x_{n}}
 \end{bmatrix}
