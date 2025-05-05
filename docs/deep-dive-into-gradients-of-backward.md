@@ -1,3 +1,4 @@
+
 # Deep dive into gradients of backward
 
 ## TL;DR
@@ -12,15 +13,20 @@
 - The `backward()` method is a key part of [PyTorch's automatic differentiation engine](https://pytorch.org/blog/overview-of-pytorch-autograd-engine), `torch.autograd`, which is essential for training neural networks.
 - This method initiates the gradient computation process when called on a tensor, provided certain conditions are met (we'll explore the reasons for these conditions later):
     1. The tensor must have `requires_grad=True`.
+
     2. If called with arguments, it needs both the input tensor and a gradient tensor of the same shape.
     3. Alternatively, if the tensor is a scalar, it can be called without arguments.
 - The method then traverses the computational graph backward, applying the chain rule of calculus:
 
-$$\frac{\partial y}{\partial x}=\Bigl(\frac{\partial y}{\partial b}\frac{\partial b}{\partial a}\Bigr)\frac{\partial a}{\partial x}\tag{1}$$
+<p align="center">
+  <img src='https://github.com/user-attachments/assets/db1ea660-0176-4c1b-a82e-007046751d9f' alt='$$\frac{\partial y}{\partial x}=\Bigl(\frac{\partial y}{\partial b}\frac{\partial b}{\partial a}\Bigr)\frac{\partial a}{\partial x}\tag{1}$$' style="display: block; margin-left: auto; margin-right: auto;"/>
+</p>
 
 - But **why not apply the chain rule in the forward direction?** Mathematically, both approaches seem equivalent:
 
-$$\frac{\partial y}{\partial x}=\frac{\partial y}{\partial b}\Bigl(\frac{\partial b}{\partial a}\frac{\partial a}{\partial x}\Bigr)\tag{2}$$
+<p align="center">
+  <img src='https://github.com/user-attachments/assets/bf8f905f-c13e-4b26-9699-2aa69e3731ae' alt='$$\frac{\partial y}{\partial x}=\frac{\partial y}{\partial b}\Bigl(\frac{\partial b}{\partial a}\frac{\partial a}{\partial x}\Bigr)\tag{2}$$' style="display: block; margin-left: auto; margin-right: auto;"/>
+</p>
 
 ## Forward Mode and Reverse Mode of Automatic Differentiation
 
@@ -35,13 +41,16 @@ $$\frac{\partial y}{\partial x}=\frac{\partial y}{\partial b}\Bigl(\frac{\partia
 - The concepts of [Vector-Jacobian Product (VJP)](https://docs.jax.dev/en/latest/notebooks/autodiff_cookbook.html#vector-jacobian-products-vjps-aka-reverse-mode-autodiff) and [Jacobian-Vector Product (JVP)](https://docs.jax.dev/en/latest/notebooks/autodiff_cookbook.html#jacobian-vector-products-jvps-aka-forward-mode-autodiff) help explain the efficiency difference.
 - Given a function $f: \mathbb{R}^n \to \mathbb{R}^m$ and an input vector $\mathbf{x}\in\mathbb{R}^n$, the Jacobian matrix $J$ of $f(x)$ has dimensions:
 
-$$J\in\mathbb{R}^{m\times n}$$
+<p align="center">
+  <img src='https://github.com/user-attachments/assets/6c8680fc-ba11-421d-a70a-eb79f4bbcbb9' alt='$$J\in\mathbb{R}^{m\times n}$$' style="display: block; margin-left: auto; margin-right: auto;"/>
+</p>
 
 ### JVP and Forward Mode AD
 
 - The JVP is calculated by multiplying the Jacobian $J$ by a vector $v\in\mathbb{R}^n$. Often, $v$ is chosen as a standard basis vector (like a one-hot vector) to extract a single column of the Jacobian:
 
-$$J\,v=\begin{bmatrix}\dfrac{\partial y_{1}}{\partial x_{1}} & \cdots & \dfrac{\partial y_{1}}{\partial x_{n}} \\
+<p align="center">
+  <img src='https://github.com/user-attachments/assets/ef78cce8-4178-4d6d-966b-771cde93cc98' alt='$$J\,v=\begin{bmatrix}\dfrac{\partial y_{1}}{\partial x_{1}} & \cdots & \dfrac{\partial y_{1}}{\partial x_{n}} \\
 \vdots & \ddots & \vdots \\
 \dfrac{\partial y_{m}}{\partial x_{1}} & \cdots & \dfrac{\partial y_{m}}{\partial x_{n}}
 \end{bmatrix}
@@ -56,7 +65,8 @@ $$J\,v=\begin{bmatrix}\dfrac{\partial y_{1}}{\partial x_{1}} & \cdots & \dfrac{\
 \dfrac{\partial y_{1}}{\partial x_{1}} \\[3pt]
 \vdots \\[3pt]
 \dfrac{\partial y_{m}}{\partial x_{1}}
-\end{bmatrix}$$
+\end{bmatrix}$$' style="display: block; margin-left: auto; margin-right: auto;"/>
+</p>
 
 - Computing a JVP effectively yields one column of the Jacobian matrix.
 - To obtain the full Jacobian, forward mode AD needs to compute $n$ JVPs, resulting in a time complexity proportional to $O(n)$.
@@ -66,7 +76,8 @@ $$J\,v=\begin{bmatrix}\dfrac{\partial y_{1}}{\partial x_{1}} & \cdots & \dfrac{\
 
 - The VJP is calculated by multiplying a vector $v\in\mathbb{R}^m$ (often a standard basis vector) by the Jacobian $J$:
 
-$$v^T\,J =
+<p align="center">
+  <img src='https://github.com/user-attachments/assets/eb16bd58-4ace-42a7-b211-ff6a752f1494' alt='$$v^T\,J =
 \begin{bmatrix}
 1 & 0 & \cdots & 0
 \end{bmatrix}
@@ -80,7 +91,8 @@ $$v^T\,J =
 \dfrac{\partial y_{1}}{\partial x_{1}} \\[3pt]
 \vdots \\[3pt]
 \dfrac{\partial y_{1}}{\partial x_{n}}
-\end{bmatrix}$$
+\end{bmatrix}$$' style="display: block; margin-left: auto; margin-right: auto;"/>
+</p>
 
 - Computing a VJP yields one row of the Jacobian matrix.
 - To obtain the full Jacobian, reverse mode AD needs to compute $m$ VJPs, resulting in a time complexity proportional to $O(m)$.
@@ -115,3 +127,11 @@ $$v^T\,J =
 - [자코비안(Jacobian) 행렬의 기하학적 의미](https://angeloyeo.github.io/2020/07/24/Jacobian.html)
 - [Nick McGreivy - A Tutorial on Automatic Differentiation for Scientific
 Design: Practical, Elegant, and Powerful](https://nickmcgreivy.scholar.princeton.edu/sites/g/files/toruqf5041/files/ast558_seminar_tutorial_on_automatic_differentiation-2.pdf)
+
+<br/>
+
+<a title="CodeCogs.com" href="https://www.codecogs.com">
+<img src="https://www.codecogs.com/images/poweredbycodecogs.png" border="0" 
+title="CodeCogs - An Open Source Scientific Library" 
+alt="Powered by CodeCogs">
+</a>
