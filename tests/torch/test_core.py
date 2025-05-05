@@ -246,13 +246,12 @@ def test_tensor_property_data_getter() -> None:
 
     # The data property should return a detached tensor
     assert data_tensor.requires_grad is False
-    assert data_tensor.creator is None
     assert data_tensor.grad_fn is None
     # Check if the underlying numpy data is the same
     assert np.array_equal(data_tensor._data, y._data)
     # Ensure the original tensor is unchanged
     assert y.requires_grad is True
-    assert y.creator is not None
+    assert y.grad_fn is not None
 
 
 def test_tensor_property_dtype() -> None:
@@ -327,7 +326,7 @@ def test_tensor_torch_method_add() -> None:
     # Check forward result
     assert np.allclose(y.numpy(), expected_sum)
     assert y.requires_grad is True
-    assert y.creator is not None
+    assert y.grad_fn is not None
 
     # Backward pass
     y.backward(torch.ones_like(y))
@@ -465,7 +464,7 @@ def test_tensor_instance_method_add() -> None:
     # Check forward result
     assert np.allclose(y.numpy(), expected_sum)
     assert y.requires_grad is True
-    assert y.creator is not None
+    assert y.grad_fn is not None
 
     # Backward pass
     y.backward(torch.ones_like(y))
@@ -873,14 +872,13 @@ def test_tensor_instance_method_detach() -> None:
 
     # Check detached tensor properties
     assert detached_y.requires_grad is False
-    assert detached_y.creator is None
     assert detached_y.grad_fn is None
     assert detached_y.dtype == y.dtype
     assert np.array_equal(detached_y._data, y._data)
 
     # Ensure the original tensor is unchanged
     assert y.requires_grad is True
-    assert y.creator is not None
+    assert y.grad_fn is not None
 
     # Check that the underlying numpy data is shared (modifying detached affects original)
     # Note: This depends on the Tensor constructor not forcing a copy.
@@ -1176,7 +1174,7 @@ def test_tensor_backpropagation_no_grad_creator_check() -> None:
         y = torch.square(x)
 
     # When no_grad is used, the creator is None
-    assert y.creator is None
+    assert y.grad_fn is None
 
     # Now compute with gradients enabled
     y = torch.square(x)
@@ -1184,9 +1182,9 @@ def test_tensor_backpropagation_no_grad_creator_check() -> None:
 
     # Gradient should be computed
     assert x.grad is not None
-    assert y.creator is not None
-    assert y.creator.inputs is not None
-    assert y.creator.outputs is not None
+    assert y.grad_fn is not None
+    assert y.grad_fn.inputs is not None
+    assert y.grad_fn.outputs is not None
     assert np.allclose(x.grad._data, 4.0)
 
 

@@ -90,10 +90,10 @@ def get_dot_graph(output: Tensor, verbose: bool = False) -> str:
             funcs.append(f)
             seen_set.add(f)
 
-    if output.creator is None:
+    if output.grad_fn is None:
         raise ValueError("output tensor has no creator")
 
-    add_func(output.creator)
+    add_func(output.grad_fn)
     txt += _dot_var(output, verbose)
 
     while funcs:
@@ -103,8 +103,8 @@ def get_dot_graph(output: Tensor, verbose: bool = False) -> str:
         for x in func.inputs:
             txt += _dot_var(x, verbose)
 
-            if x.creator is not None:
-                add_func(x.creator)
+            if x.grad_fn is not None:
+                add_func(x.grad_fn)
 
     return f"digraph g {{\n{txt}}}"
 

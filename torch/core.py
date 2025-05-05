@@ -69,7 +69,7 @@ class Function:
 
             # set the creator(a.k.a. grad_fn) of the output
             for output in outputs:
-                output.creator = self
+                output.grad_fn = self
 
             # set the inputs and outputs
             # NOTE: For memory optimization we wraps output tensors with weakref,
@@ -394,8 +394,8 @@ class Tensor:
     def __repr__(self) -> str:
         p = str(self._data).replace("\n", "\n" + " " * 7)
 
-        if self.creator:
-            return f"tensor({p}, dtype={self.dtype}, grad_fn={self.creator})"
+        if self.grad_fn:
+            return f"tensor({p}, dtype={self.dtype}, grad_fn={self.grad_fn})"
         elif self.requires_grad:
             return f"tensor({p}, dtype={self.dtype}, requires_grad=True)"
         else:
@@ -426,21 +426,13 @@ class Tensor:
         self._data = input_tensor._data
 
     @property
-    def creator(self) -> Function | None:
-        return self._creator
-
-    @creator.setter
-    def creator(self, func: Function) -> None:
-        self._creator = func
-        self.generation = func.generation + 1
-
-    @property
     def grad_fn(self) -> Function | None:
         return self._creator
 
     @grad_fn.setter
     def grad_fn(self, func: Function) -> None:
         self._creator = func
+        self.generation = func.generation + 1
 
     @property
     def ndim(self) -> int:
@@ -700,8 +692,8 @@ class Tensor:
 
                     # If the input has a creator, it means that the input is an output of another function.
                     # So, we need to add the creator to the list of functions to get another gradient.
-                    if x.creator is not None:
-                        add_func(x.creator)
+                    if x.grad_fn is not None:
+                        add_func(x.grad_fn)
 
             if not retain_graph:
                 for output in f.outputs:
