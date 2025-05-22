@@ -12,6 +12,7 @@ from typing import (
 )
 
 import numpy as np
+from loguru import logger
 
 from .priority_queue import PriorityQueue
 from .types import (
@@ -178,8 +179,18 @@ class Mul(Function):
         assert len(gys) == 1, "Mul must take one argument"
 
         if self.inplace:
-            # TODO
-            ...
+            x0, x1 = self.inputs
+
+            try:
+                x0 /= x1
+            except ZeroDivisionError:
+                logger.warning(
+                    "Zero division occurred in Mul.backward. Adding eps to the divisor."
+                )
+                eps = 1e-7
+                x0 /= x1 + eps
+
+            self.inputs[0]._data = x0._data
 
         gy = gys[0]
         x0, x1 = self.inputs
@@ -335,6 +346,13 @@ def mul(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     return result[0]
 
 
+def mul_(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> None:
+    """https://pytorch.org/docs/stable/generated/torch.Tensor.mul_.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
+    Mul()(x0, x1, inplace=True)
+
+
 def neg(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.neg.html"""
     x = as_tensor(x)
@@ -441,6 +459,7 @@ class Tensor:
     pow = pow
     add_ = add_
     sub_ = sub_
+    mul_ = mul_
 
     # NOTE: set the priority of tensor to be higher than numpy array.
     # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,
