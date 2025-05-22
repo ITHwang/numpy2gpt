@@ -72,6 +72,13 @@
       c --> Func4[Func4 @ 2]
       Func4 --> y((y @ 3))
     ```
+  
+  - **What if we do in-place operations?**
+    - PyTorch support in-place operations of tensors by attaching an underscore("_") to the method name.(It discourages users to do in-place operations though.. [link](https://pytorch.org/docs/stable/autograd.html#in-place-operations-on-tensors))
+    - To implement them, a tensor should be able to have multiple creators, because in-place operations make the tensor an input/output at the same time.
+    - When the tensor do $N$ in-place operations, the tensor will have $N + 1$ creators.
+    - Here an example:
+    - TBD: a diagram for in-place operations
 4. Memory Optimization
   - As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
   - To avoid this, we use `weakref.ref` for the outputs of the function.
@@ -115,17 +122,17 @@ In the Define-by-Run paradigm, the computational graph is constructed dynamicall
 
 ### 2.3. Summary
 
-| Feature | Define-and-Run | Define-by-Run |
-|---------|---------------|---------------|
-| Graph Construction | Pre-compiled static graph | Dynamic graph built during execution |
-| Programming Style | Domain-specific language | Native Python code |
-| Debugging | Harder (debugging compiled graph) | Easier (standard Python debugging) |
-| Performance | Potentially better (global optimization) | Potentially worse (less optimization) |
-| Flexibility | Less flexible for dynamic patterns | More flexible for dynamic patterns |
-| Deployment | Easier to deploy to production/devices | More dependent on Python runtime |
-| Learning Curve | Steeper | More intuitive for Python developers |
-| Use Cases | Production deployment, mobile/edge devices | Research, rapid prototyping |
-| Examples | TensorFlow 1.x, Theano | PyTorch, TensorFlow Eager |
+| Feature            | Define-and-Run                             | Define-by-Run                         |
+| ------------------ | ------------------------------------------ | ------------------------------------- |
+| Graph Construction | Pre-compiled static graph                  | Dynamic graph built during execution  |
+| Programming Style  | Domain-specific language                   | Native Python code                    |
+| Debugging          | Harder (debugging compiled graph)          | Easier (standard Python debugging)    |
+| Performance        | Potentially better (global optimization)   | Potentially worse (less optimization) |
+| Flexibility        | Less flexible for dynamic patterns         | More flexible for dynamic patterns    |
+| Deployment         | Easier to deploy to production/devices     | More dependent on Python runtime      |
+| Learning Curve     | Steeper                                    | More intuitive for Python developers  |
+| Use Cases          | Production deployment, mobile/edge devices | Research, rapid prototyping           |
+| Examples           | TensorFlow 1.x, Theano                     | PyTorch, TensorFlow Eager             |
 
 This implementation follows the Define-by-Run paradigm, similar to PyTorch.
 

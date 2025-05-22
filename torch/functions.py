@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import numpy as np
 
-from .core import Function, Tensor
+from .core import Function, Tensor, as_tensor
 from .types import INPUT_TYPE
 
 
 class Sin(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Sin must take one argument"
+
+        if inplace:
+            raise NotImplementedError(
+                "Sin does not currently support the inplace operation"
+            )
 
         x = xs[0]
 
@@ -16,6 +21,11 @@ class Sin(Function):
 
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Sin must take one argument"
+
+        if self.inplace:
+            raise NotImplementedError(
+                "Sin does not currently support the inplace operation"
+            )
 
         gy = gys[0]
         x = self.inputs[0]
@@ -25,8 +35,13 @@ class Sin(Function):
 
 
 class Cos(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Cos must take one argument"
+
+        if inplace:
+            raise NotImplementedError(
+                "Cos does not currently support the inplace operation"
+            )
 
         x = xs[0]
 
@@ -34,6 +49,11 @@ class Cos(Function):
 
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Cos must take one argument"
+
+        if self.inplace:
+            raise NotImplementedError(
+                "Cos does not currently support the inplace operation"
+            )
 
         gy = gys[0]
         x = self.inputs[0]
@@ -43,8 +63,13 @@ class Cos(Function):
 
 
 class Square(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Square must take one argument"
+
+        if inplace:
+            raise NotImplementedError(
+                "Square does not currently support the inplace operation"
+            )
 
         x = xs[0]
         y = x**2
@@ -54,6 +79,11 @@ class Square(Function):
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Square must take one argument"
 
+        if self.inplace:
+            raise NotImplementedError(
+                "Square does not currently support the inplace operation"
+            )
+
         gy = gys[0]
         x = self.inputs[0]
         gx: Tensor = 2 * x * gy
@@ -62,8 +92,13 @@ class Square(Function):
 
 
 class Exp(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Exp must take one argument"
+
+        if inplace:
+            raise NotImplementedError(
+                "Exp does not currently support the inplace operation"
+            )
 
         x = xs[0]
         y = np.exp(x)
@@ -73,6 +108,11 @@ class Exp(Function):
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Exp must take one argument"
 
+        if self.inplace:
+            raise NotImplementedError(
+                "Exp does not currently support the inplace operation"
+            )
+
         gy = gys[0]
         x = self.inputs[0]
         gx: Tensor = exp(x) * gy
@@ -81,8 +121,13 @@ class Exp(Function):
 
 
 class Tanh(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Tanh must take one argument"
+
+        if inplace:
+            raise NotImplementedError(
+                "Tanh does not currently support the inplace operation"
+            )
 
         x = xs[0]
 
@@ -90,6 +135,11 @@ class Tanh(Function):
 
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Tanh must take one argument"
+
+        if self.inplace:
+            raise NotImplementedError(
+                "Tanh does not currently support the inplace operation"
+            )
 
         gy = gys[0]
         y = self.outputs[0]()
@@ -100,8 +150,11 @@ class Tanh(Function):
 
 def sin(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.sin.html"""
+    x = as_tensor(x)
+
     result = Sin()(x)
 
+    assert isinstance(result, tuple), "sin isn't in-place operation"
     assert len(result) == 1, "sin must return a single Tensor"
 
     return result[0]
@@ -109,8 +162,11 @@ def sin(x: INPUT_TYPE | Tensor) -> Tensor:
 
 def cos(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.cos.html"""
+    x = as_tensor(x)
+
     result = Cos()(x)
 
+    assert isinstance(result, tuple), "cos isn't in-place operation"
     assert len(result) == 1, "cos must return a single Tensor"
 
     return result[0]
@@ -118,8 +174,11 @@ def cos(x: INPUT_TYPE | Tensor) -> Tensor:
 
 def square(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.square.html"""
+    x = as_tensor(x)
+
     result = Square()(x)
 
+    assert isinstance(result, tuple), "square must return a tuple"
     assert len(result) == 1, "square must return a single Tensor"
 
     return result[0]
@@ -127,8 +186,11 @@ def square(x: INPUT_TYPE | Tensor) -> Tensor:
 
 def exp(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.exp.html"""
+    x = as_tensor(x)
+
     result = Exp()(x)
 
+    assert isinstance(result, tuple), "exp must return a tuple"
     assert len(result) == 1, "exp must return a single Tensor"
 
     return result[0]
@@ -136,8 +198,11 @@ def exp(x: INPUT_TYPE | Tensor) -> Tensor:
 
 def tanh(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.tanh.html"""
+    x = as_tensor(x)
+
     result = Tanh()(x)
 
+    assert isinstance(result, tuple), "tanh must return a tuple"
     assert len(result) == 1, "tanh must return a single Tensor"
 
     return result[0]

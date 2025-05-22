@@ -7,6 +7,8 @@ from typing import (
     ContextManager,
     Generator,
     Iterator,
+    Literal,
+    overload,
 )
 
 import numpy as np
@@ -25,7 +27,11 @@ from .types import (
 
 
 class Function:
-    def __call__(self, *input_args: INPUT_TYPE | Tensor) -> tuple[Tensor, ...]:
+    inplace: bool = False
+
+    def __call__(
+        self, *inputs: Tensor, inplace: bool = False
+    ) -> tuple[Tensor, ...] | None:
         """Do forward propagation.
         self.generation: the generation of the function.
             A function gets inputs and outputs.
@@ -43,18 +49,38 @@ class Function:
             when the input is a zero-dimensional array.
 
         Args:
-            input_args: list[Tensor] is expected, but also any numeric or array object can be accepted.
-
+            *inputs: input Tensors
+            inplace: Whether to perform the in-place operation.
         Returns:
-            Tensor | list[Tensor]
+            tuple[Tensor, ...] for normal operations.
+            None for in-place operations.
         """
-        inputs: tuple[Tensor, ...] = tuple(as_tensor(input) for input in input_args)
+        assert isinstance(inputs, tuple) and all(
+            isinstance(input, Tensor) for input in inputs
+        )
+
+        if inplace and any(input.is_leaf and input.requires_grad for input in inputs):
+            raise RuntimeError(
+                "a leaf Variable that requires grad is being used in an in-place operation."
+            )
 
         # forward propagation
         xs = tuple(input._data for input in inputs)
-        ys = self.forward(*xs)
+
+        # NOTE: temporary if-branch for only add inplace operation.
+        # After all inplace operations are implemented, remove the if-branch.
+        if inplace:
+            ys = self.forward(*xs, inplace=inplace)
+        else:
+            ys = self.forward(*xs)
+
         if not isinstance(ys, tuple):
             ys = (ys,)
+
+        if inplace and len(ys) > 1:
+            raise ValueError(
+                "In-place operation is not supported for multiple outputs."
+            )
 
         # If any input requires grad, the output should require grad.
         should_outputs_require_grad: bool = any(input.requires_grad for input in inputs)
@@ -62,26 +88,50 @@ class Function:
             Tensor(y, requires_grad=should_outputs_require_grad) for y in ys
         )
 
-        # When only inferencing, we can skip the logic below which is needed for backpropagation.
+        # When backpropagation is enabled, we need to set the creator(a.k.a. grad_fn) of the output.
         if Config.enable_backprop and should_outputs_require_grad:
             # If the generations of inputs are different, the higher generation will be the one of the function.
             self.generation = max([input.generation for input in inputs])
 
-            # set the creator(a.k.a. grad_fn) of the output
-            for output in outputs:
-                output.grad_fn = self
-
-            # set the inputs and outputs
-            # NOTE: For memory optimization we wraps output tensors with weakref,
-            #       by removing the circular reference between the function and the output tensor.
             self.inputs: tuple[Tensor, ...] = inputs
-            self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
-                weakref.ref(output) for output in outputs
-            )
+
+            if inplace:
+                # For in-place operations, set this function as the gradient function (grad_fn)
+                # of the first input tensor, which is being modified in-place
+                # The input tensor may have multiple creators, stored in order of generation
+                inputs[0].grad_fn = self
+                inputs[0]._data = ys[0]
+            else:
+                # Use weak references to output tensors to avoid circular references
+                # This optimizes memory usage by allowing garbage collection
+                # NOTE: We don't need to create self.outputs in in-place operation
+                # because the output is the same as the first input.
+                self.outputs: tuple[weakref.ref[Tensor], ...] = tuple(
+                    weakref.ref(output) for output in outputs
+                )
+
+                # Set this function as the gradient function for all output tensors
+                for output in outputs:
+                    output.grad_fn = self
+        # When only inferencing and inplace is True,
+        elif inplace:
+            inputs[0]._data = ys[0]
+            return None
 
         return outputs
 
-    def forward(self, *xs: np.ndarray) -> np.ndarray | tuple[np.ndarray, ...]:
+    @overload
+    def forward(
+        self, *xs: np.ndarray, inplace: Literal[False] = False
+    ) -> np.ndarray | tuple[np.ndarray, ...]: ...
+
+    # TODO: Firstly, we allow inplace operation for Add, Mul, Sub, Div, Pow, Neg.
+    @overload
+    def forward(self, *xs: np.ndarray, inplace: Literal[True]) -> np.ndarray: ...
+
+    def forward(
+        self, *xs: np.ndarray, inplace: bool = False
+    ) -> np.ndarray | tuple[np.ndarray, ...]:
         raise NotImplementedError
 
     def backward(self, *gys: Tensor) -> Tensor | tuple[Tensor, ...]:
@@ -89,8 +139,10 @@ class Function:
 
 
 class Add(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 2, "Add must take two arguments"
+
+        self.inplace = inplace
 
         x0, x1 = xs
         y = x0 + x1
@@ -100,14 +152,23 @@ class Add(Function):
     def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
         assert len(gys) == 1, "Add must take one argument"
 
+        if self.inplace:
+            # Revert the in-place operation.
+            x0, x1 = self.inputs
+            x0 = x0 - x1
+
+            self.inputs[0]._data = x0._data
+
         gy = gys[0]
 
         return gy, gy
 
 
 class Mul(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 2, "Mul must take two arguments"
+
+        self.inplace = inplace
 
         x0, x1 = xs
         y = x0 * x1
@@ -116,6 +177,10 @@ class Mul(Function):
 
     def backward(self, *gys: Tensor) -> tuple[Tensor, ...]:
         assert len(gys) == 1, "Mul must take one argument"
+
+        if self.inplace:
+            # TODO
+            ...
 
         gy = gys[0]
         x0, x1 = self.inputs
@@ -126,8 +191,10 @@ class Mul(Function):
 
 
 class Neg(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Neg must take one argument"
+
+        self.inplace = inplace
 
         x = xs[0]
 
@@ -136,14 +203,20 @@ class Neg(Function):
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Neg must take one argument"
 
+        if self.inplace:
+            # TODO
+            ...
+
         gy = gys[0]
 
         return -gy
 
 
 class Sub(Function):
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 2, "Sub must take two arguments"
+
+        self.inplace = inplace
 
         x0, x1 = xs
 
@@ -151,6 +224,10 @@ class Sub(Function):
 
     def backward(self, *gys: Tensor) -> tuple[Tensor, ...]:
         assert len(gys) == 1, "Sub must take one argument"
+
+        if self.inplace:
+            # TODO
+            ...
 
         gy = gys[0]
         gx0 = gy
@@ -173,8 +250,10 @@ class Div(Function):
     For simplicity, we only implement true division with the '/' operator.
     """
 
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 2, "Div must take two arguments"
+
+        self.inplace = inplace
 
         x0, x1 = xs
 
@@ -182,6 +261,10 @@ class Div(Function):
 
     def backward(self, *gys: Tensor) -> tuple[Tensor, Tensor]:
         assert len(gys) == 1, "Div must take one argument"
+
+        if self.inplace:
+            # TODO
+            ...
 
         gy = gys[0]
         x0, x1 = self.inputs
@@ -196,8 +279,10 @@ class Pow(Function):
     def __init__(self, c: int | float) -> None:
         self.c = c
 
-    def forward(self, *xs: np.ndarray) -> np.ndarray:
+    def forward(self, *xs: np.ndarray, inplace: bool = False) -> np.ndarray:
         assert len(xs) == 1, "Pow must take one argument"
+
+        self.inplace = inplace
 
         x = xs[0]
 
@@ -205,6 +290,10 @@ class Pow(Function):
 
     def backward(self, *gys: Tensor) -> Tensor:
         assert len(gys) == 1, "Pow must take one argument"
+
+        if self.inplace:
+            # TODO
+            ...
 
         gy = gys[0]
         x = self.inputs[0]
@@ -215,17 +304,30 @@ class Pow(Function):
 
 def add(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.add.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
     result = Add()(x0, x1)
 
+    assert isinstance(result, tuple), "Add must return a tuple of Tensors"
     assert len(result) == 1, "Add must return a single Tensor"
 
     return result[0]
 
 
+def add_(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> None:
+    """https://pytorch.org/docs/stable/generated/torch.Tensor.add_.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
+    Add()(x0, x1, inplace=True)
+
+
 def mul(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.mul.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
     result = Mul()(x0, x1)
 
+    assert isinstance(result, tuple), "Mul must return a tuple of Tensors"
     assert len(result) == 1, "Mul must return a single Tensor"
 
     return result[0]
@@ -233,8 +335,11 @@ def mul(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
 
 def neg(x: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.neg.html"""
+    x = as_tensor(x)
+
     result = Neg()(x)
 
+    assert isinstance(result, tuple), "Neg must return a tuple of Tensors"
     assert len(result) == 1, "Neg must return a single Tensor"
 
     return result[0]
@@ -242,16 +347,22 @@ def neg(x: INPUT_TYPE | Tensor) -> Tensor:
 
 def sub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.sub.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
     result = Sub()(x0, x1)
 
+    assert isinstance(result, tuple), "Sub must return a tuple of Tensors"
     assert len(result) == 1, "Sub must return a single Tensor"
 
     return result[0]
 
 
 def rsub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
     result = Sub()(x1, x0)
 
+    assert isinstance(result, tuple), "rsub must return a tuple of Tensors"
     assert len(result) == 1, "rsub must return a single Tensor"
 
     return result[0]
@@ -259,16 +370,22 @@ def rsub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
 
 def div(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.div.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
     result = Div()(x0, x1)
 
+    assert isinstance(result, tuple), "div must return a tuple of Tensors"
     assert len(result) == 1, "div must return a single Tensor"
 
     return result[0]
 
 
 def rdiv(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
     result = Div()(x1, x0)
 
+    assert isinstance(result, tuple), "rdiv must return a tuple of Tensors"
     assert len(result) == 1, "rdiv must return a single Tensor"
 
     return result[0]
@@ -276,8 +393,11 @@ def rdiv(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
 
 def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor:
     """https://pytorch.org/docs/stable/generated/torch.pow.html"""
+    x = as_tensor(x)
+
     result = Pow(c)(x)
 
+    assert isinstance(result, tuple), "pow must return a tuple of Tensors"
     assert len(result) == 1, "pow must return a single Tensor"
 
     return result[0]
@@ -310,6 +430,7 @@ class Tensor:
     sub = sub
     div = div
     pow = pow
+    add_ = add_
 
     # NOTE: set the priority of tensor to be higher than numpy array.
     # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,
@@ -325,23 +446,6 @@ class Tensor:
     ) -> None:
         """
         self.grad: numpy.ndarray | None
-        self.creator: when forwarding, memorize the function that created this tensor
-            for backward propagation.
-            Similarly, in PyTorch `Variable`s have the notion of a `gradient_edge`, which is the
-            edge in the autograd graph that connects the variable to a particular input
-            of the gradient function(`grad_fn` or `grad_accumulator`).
-        self.grad_fn: The exactly same as self.creator, just for making this class more like PyTorch.
-        self.generation: the generation of the tensor.
-            A function gets inputs and outputs.
-            e.g., [input] -> [function] -> [output]
-
-            The generation of the input will be the generation of the function.
-            The generation of the output is the generation of the function plus 1.
-            e.g., [input][gen=2] -> [function][gen=2] -> [output][gen=3]
-
-            Generation is for determining the order of backward propagation.
-            The backward propagation that has inputs with higher generation will be called first.
-            If the generations of inputs are different, the higher generation will be the one of the function.
 
         Args:
             data: numpy.ndarray | int | float | None
@@ -379,10 +483,10 @@ class Tensor:
             )
 
         self._data: np.ndarray = data
+        # We can have multiple creators when the tensor is the input and the output(in-place operation)
+        self._creators: PriorityQueue[Function] = PriorityQueue()
         self.name = name
         self.grad: Tensor | None = None
-        self._creator: Function | None = None
-        self.generation: int = 0
         self.requires_grad = requires_grad
 
     def __len__(self) -> int:
@@ -426,13 +530,45 @@ class Tensor:
         self._data = input_tensor._data
 
     @property
+    def generation(self) -> int:
+        """The generation of the tensor.
+
+        A function gets inputs and outputs.
+        e.g., [input] -> [function] -> [output]
+
+        The generation of the input will be the generation of the function.
+        The generation of the output is the generation of the function plus 1.
+        e.g., [input][gen=2] -> [function][gen=2] -> [output][gen=3]
+
+        Generation is for determining the order of backward propagation.
+        The backward propagation that has inputs with higher generation will be called first.
+        If the generations of inputs are different, the higher generation will be the one of the function.
+
+        The generation of the tensor is the generation of the function that created the tensor most recently.
+        The function should have the youngest(biggest) generation among self._creators.
+        """
+        if (youngest_creator := self._creators.peek()) is not None:
+            return youngest_creator.generation + 1
+        else:
+            return 0
+
+    @property
     def grad_fn(self) -> Function | None:
-        return self._creator
+        """The function that created this tensor.
+
+        Returns the youngest(biggest) function in self._creators.
+        Creators:
+            When forwarding, memorize the function that created this tensor for backward propagation.
+            Similarly, in PyTorch `Variable`s have the notion of a `gradient_edge`, which is the edge
+            in the autograd graph that connects the variable to a particular input of the gradient function
+            (`grad_fn` or `grad_accumulator`).
+            The tensor which does in-place operation has multiple creators.
+        """
+        return self._creators.peek()
 
     @grad_fn.setter
     def grad_fn(self, func: Function) -> None:
-        self._creator = func
-        self.generation = func.generation + 1
+        self._creators.push(func, func.generation)
 
     @property
     def ndim(self) -> int:
@@ -621,7 +757,7 @@ class Tensor:
                         )
                 else:
                     self.grad = gradient
-            elif self._creator is None:
+            elif self.grad_fn is None:
                 # The final output tensor of the computational graph does not require grad.
                 raise RuntimeError(
                     "element 0 of tensors does not require grad and does not have a grad_fn"
@@ -648,31 +784,41 @@ class Tensor:
                 funcs.push(f, f.generation)
                 seen_set.add(f)
 
-        # push the creator which creates the final output
-        if self._creator is None:
-            raise ValueError("The final output should have a creator")
-        add_func(self._creator)
+        if self.grad_fn:
+            for creator in self._creators.items():
+                add_func(creator)
+        else:
+            raise ValueError("The final output should have a grad_fn")
 
         while funcs:
             f = funcs.pop()
 
             # get gradients of outputs
-            # NOTE: f.outputs is a tuple of weakref.ref[Tensor]
+            # If the function is in-place, pass the first input's grad as the output grad.
             gys = []
-            for output in f.outputs:
-                output_tensor = output()
+            if f.inplace:
+                if (first_input_grad := f.inputs[0].grad) is not None:
+                    gys.append(first_input_grad)
+                    f.inputs[0].grad = None
+                else:
+                    raise ValueError(
+                        "The first input of the inplace function must have a grad."
+                    )
+            else:
+                for output in f.outputs:
+                    output_tensor = output()
 
-                assert output_tensor is not None, (
-                    f"The outputs of the function {f} must not be None."
-                )
+                    assert output_tensor is not None, (
+                        f"The outputs of the function {f} must not be None."
+                    )
 
-                gy = output_tensor.grad
+                    gy = output_tensor.grad
 
-                assert gy is not None, (
-                    f"The gradient of the output {output_tensor} of the function {f} must not be None."
-                )
+                    assert gy is not None, (
+                        f"The gradient of the output {output_tensor} of the function {f} must not be None."
+                    )
 
-                gys.append(gy)
+                    gys.append(gy)
 
             # NOTE: f.backward(*gys) calls Function.__call__() which refers to the value of `enable_backprop`.
             # That's why we need to set the value of `enable_backprop` here.
@@ -693,9 +839,10 @@ class Tensor:
                     # If the input has a creator, it means that the input is an output of another function.
                     # So, we need to add the creator to the list of functions to get another gradient.
                     if x.grad_fn is not None:
-                        add_func(x.grad_fn)
+                        for creator in x._creators.items():
+                            add_func(creator)
 
-            if not retain_graph:
+            if not retain_graph and not f.inplace:
                 for output in f.outputs:
                     # NOTE: output is a weakref.ref[Tensor]
                     output_tensor = output()

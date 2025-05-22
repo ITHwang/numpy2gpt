@@ -254,6 +254,14 @@ def test_tensor_property_data_getter() -> None:
     assert y.grad_fn is not None
 
 
+def test_tensor_property_data_setter() -> None:
+    """Test the `data` property setter."""
+    x = torch.tensor(np.array([1.0, 2.0]), requires_grad=True)
+    y = torch.square(x)
+    y.data = torch.tensor(np.array([3.0, 4.0]))
+    assert np.array_equal(y._data, np.array([3.0, 4.0]))
+
+
 def test_tensor_property_dtype() -> None:
     """Test the dtype property returns the correct torch type for different numpy dtypes."""
     # Test int32
@@ -785,10 +793,54 @@ def test_tensor_magic_method_pow() -> None:
 # ==================================================
 
 
+def test_leaf_tensor_with_grad_inplace_operation_error() -> None:
+    """Test if a leaf tensor with grad is used in an in-place operation."""
+    x = torch.tensor(np.array(1.0), requires_grad=True)
+    with pytest.raises(RuntimeError) as excinfo:
+        x.add_(x)
+    assert (
+        "a leaf Variable that requires grad is being used in an in-place operation"
+        in str(excinfo.value)
+    )
+
+
 def test_tensor_inplace_method_add() -> None:
     """Test `tensor1.add_(tensor2)`."""
-    # TODO
-    assert True
+    # Case 1: requires_grad=True
+    x0 = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+    x1 = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+
+    # Perform inplace add
+    y = x0.add(x1)
+    ret = y.add_([10.0, 20.0, 30.0])
+
+    # --- Check operation ---
+    assert ret is None, "Inplace add should return None"
+    assert np.allclose(y.numpy(), np.array([15.0, 27.0, 39.0])), (
+        "Data not updated correctly"
+    )
+
+    # --- Check backward ---
+    y.backward(torch.ones_like(y))
+
+    assert (x0_grad := x0.grad) is not None
+    assert (x1_grad := x1.grad) is not None
+
+    assert np.allclose(x0_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
+        "Gradient for x0 is incorrect"
+    )
+    assert np.allclose(x1_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
+        "Gradient for x1 is incorrect"
+    )
+
+    # Case 2: requires_grad=False
+    x0_no_grad = torch.tensor([1.0, 2.0, 3.0], requires_grad=False)
+    x1_no_grad = torch.tensor([4.0, 5.0, 6.0], requires_grad=False)
+
+    ret_no_grad = x0_no_grad.add_(x1_no_grad)
+
+    assert ret_no_grad is None
+    assert np.allclose(x0_no_grad.numpy(), np.array([5.0, 7.0, 9.0]))
 
 
 def test_tensor_inplace_method_sub() -> None:

@@ -1,5 +1,5 @@
 import heapq
-from typing import Generic, TypeVar
+from typing import Generator, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -38,3 +38,11 @@ class PriorityQueue(Generic[T]):
     def __len__(self) -> int:
         """Return the number of items in the queue."""
         return len(self._queue)
+
+    def items(self) -> Generator[T, None, None]:
+        """Yield the items in the queue.
+
+        It doesn't obey the order of the priority.
+        """
+        for _, _, item in self._queue:
+            yield item

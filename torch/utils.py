@@ -91,7 +91,7 @@ def get_dot_graph(output: Tensor, verbose: bool = False) -> str:
             seen_set.add(f)
 
     if output.grad_fn is None:
-        raise ValueError("output tensor has no creator")
+        raise ValueError("output tensor has no grad_fn")
 
     add_func(output.grad_fn)
     txt += _dot_var(output, verbose)
