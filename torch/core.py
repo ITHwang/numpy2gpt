@@ -125,7 +125,6 @@ class Function:
         self, *xs: np.ndarray, inplace: Literal[False] = False
     ) -> np.ndarray | tuple[np.ndarray, ...]: ...
 
-    # TODO: Firstly, we allow inplace operation for Add, Mul, Sub, Div, Pow, Neg.
     @overload
     def forward(self, *xs: np.ndarray, inplace: Literal[True]) -> np.ndarray: ...
 
@@ -226,8 +225,11 @@ class Sub(Function):
         assert len(gys) == 1, "Sub must take one argument"
 
         if self.inplace:
-            # TODO
-            ...
+            # Revert the in-place operation.
+            x0, x1 = self.inputs
+            x0 = x0 + x1
+
+            self.inputs[0]._data = x0._data
 
         gy = gys[0]
         gx0 = gy
@@ -357,6 +359,13 @@ def sub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     return result[0]
 
 
+def sub_(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> None:
+    """https://pytorch.org/docs/stable/generated/torch.Tensor.sub_.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
+    Sub()(x0, x1, inplace=True)
+
+
 def rsub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     x0, x1 = as_tensor(x0), as_tensor(x1)
 
@@ -431,6 +440,7 @@ class Tensor:
     div = div
     pow = pow
     add_ = add_
+    sub_ = sub_
 
     # NOTE: set the priority of tensor to be higher than numpy array.
     # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,

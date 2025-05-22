@@ -845,8 +845,44 @@ def test_tensor_inplace_method_add() -> None:
 
 def test_tensor_inplace_method_sub() -> None:
     """Test `tensor1.sub_(tensor2)`."""
-    # TODO
-    assert True
+    # Case 1: requires_grad=True
+    x0 = torch.tensor([10.0, 20.0, 30.0], requires_grad=True)
+    x1 = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+    x2 = torch.tensor([5.0, 6.0, 7.0], requires_grad=False)
+
+    # Perform inplace sub
+    y = x0.add(x1)
+    ret = y.sub_(torch.tensor([5.0, 6.0, 7.0]))
+
+    # --- Check operation ---
+    assert ret is None, "Inplace sub should return None"
+    assert np.allclose(y.numpy(), np.array([6.0, 16.0, 26.0])), (
+        "Data not updated correctly after add and sub_"
+    )
+
+    # --- Check backward ---
+    y.backward(torch.ones_like(y))
+
+    assert (x0_grad := x0.grad) is not None
+    assert (x1_grad := x1.grad) is not None
+
+    assert np.allclose(x0_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
+        "Gradient for x0 is incorrect after sub_"
+    )
+    assert np.allclose(x1_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
+        "Gradient for x1 is incorrect after sub_"
+    )
+
+    # Case 2: requires_grad=False
+    x0_no_grad = torch.tensor([10.0, 20.0, 30.0], requires_grad=False)
+    x1_no_grad = torch.tensor([1.0, 2.0, 3.0], requires_grad=False)
+    x2_no_grad = torch.tensor([5.0, 6.0, 7.0], requires_grad=False)
+
+    y_no_grad = x0_no_grad.sub(x1_no_grad)
+    ret_no_grad = y_no_grad.sub_(x2_no_grad)
+
+    assert ret_no_grad is None
+    assert np.allclose(y_no_grad.numpy(), np.array([4.0, 12.0, 20.0]))
 
 
 def test_tensor_inplace_method_mul() -> None:
