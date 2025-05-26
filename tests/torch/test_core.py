@@ -804,6 +804,26 @@ def test_leaf_tensor_with_grad_inplace_operation_error() -> None:
     )
 
 
+def test_tensor_inplace_method_accumulate_grads() -> None:
+    """Test if the grads are accumulated when using in-place methods."""
+
+    x0 = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+    x1 = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+    x2 = torch.tensor([7.0, 8.0, 9.0], requires_grad=True)
+
+    y = x0.add(x1)
+    y.mul_(x2)
+    y.pow_(2)
+
+    y.backward(torch.ones_like(y), retain_graph=True)
+
+    # y_grad = 2 * [35, 56, 81] * x2
+    assert (y_grad := y.grad) is not None
+    assert np.allclose(y_grad.numpy(), np.array([490.0, 896.0, 1458.0])), (
+        "Gradient for y is incorrect"
+    )
+
+
 def test_tensor_inplace_method_add() -> None:
     """Test `tensor1.add_(tensor2)`."""
     # Case 1: requires_grad=True
@@ -992,14 +1012,83 @@ def test_tensor_inplace_method_div() -> None:
 
 def test_tensor_inplace_method_neg() -> None:
     """Test `tensor.neg_()`."""
-    # TODO
-    assert True
+    # Case 1: requires_grad=True
+    x0 = torch.tensor([1.0, -2.0, 3.0, -4.0], requires_grad=True)
+    x1 = torch.tensor([5.0, 6.0, 7.0, 8.0], requires_grad=True)
+
+    y = x0.mul(x1)
+    ret = y.neg_()
+
+    # --- Check operation ---
+    assert ret is None, "Inplace neg should return None"
+    assert np.allclose(y.numpy(), np.array([-5.0, 12.0, -21.0, 32.0])), (
+        "Data not updated correctly for neg_"
+    )
+
+    # --- Check backward ---
+    y.backward(torch.ones_like(y))  # Gradient of loss w.r.t. y
+
+    assert (x0_grad := x0.grad) is not None
+    assert (x1_grad := x1.grad) is not None
+    assert np.allclose(x0_grad.numpy(), np.array([-5.0, -6.0, -7.0, -8.0])), (
+        "Gradient for x is incorrect after neg_"
+    )
+    assert np.allclose(x1_grad.numpy(), np.array([-1.0, 2.0, -3.0, 4.0])), (
+        "Gradient for x1 is incorrect after neg_"
+    )
+
+    # Case 2: requires_grad=False
+    x0_no_grad = torch.tensor([1.0, -2.0, 3.0, -4.0], requires_grad=False)
+
+    ret1 = x0_no_grad.neg_()
+    ret2 = x0_no_grad.neg_()
+
+    assert ret1 is None
+    assert ret2 is None
+
+    assert np.allclose(x0_no_grad.numpy(), np.array([1.0, -2.0, 3.0, -4.0]))
 
 
 def test_tensor_inplace_method_pow() -> None:
     """Test `tensor.pow_(c)`."""
-    # TODO
-    assert True
+    # Case 1: requires_grad=True
+    x0 = torch.tensor([2.0, 3.0, 4.0], requires_grad=True)
+    x1 = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+
+    y = x0.mul(x1)  # y = [2.0, 6.0, 12.0]
+    ret = y.pow_(2)  # y = [4.0, 36.0, 144.0]
+
+    # --- Check operation ---
+    assert ret is None, "Inplace pow should return None"
+    assert np.allclose(y.numpy(), np.array([4.0, 36.0, 144.0])), (
+        "Data not updated correctly for pow_"
+    )
+
+    # --- Check backward ---
+    y.backward(torch.ones_like(y))  # Gradient of loss w.r.t. y
+
+    assert (x0_grad := x0.grad) is not None
+    assert (x1_grad := x1.grad) is not None
+    # 2 * y * x1
+    assert np.allclose(x0_grad.numpy(), np.array([4.0, 24.0, 72.0])), (
+        "Gradient for x0 is incorrect after pow_"
+    )
+    # 2 * y * x0
+    assert np.allclose(x1_grad.numpy(), np.array([8.0, 36.0, 96.0])), (
+        "Gradient for x1 is incorrect after pow_"
+    )
+
+    # Case 2: requires_grad=False
+    x0_no_grad = torch.tensor([2.0, 3.0, 4.0], requires_grad=False)
+
+    # (x0 ** 2) ** 2 = x0 ** 4
+    ret1 = x0_no_grad.pow_(2)
+    ret2 = x0_no_grad.pow_(2)
+
+    assert ret1 is None
+    assert ret2 is None
+
+    assert np.allclose(x0_no_grad.numpy(), np.array([16.0, 81.0, 256.0]))
 
 
 # ==================================================

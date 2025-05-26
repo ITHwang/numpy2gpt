@@ -219,8 +219,9 @@ class Neg(Function):
         assert len(gys) == 1, "Neg must take one argument"
 
         if self.inplace:
-            # TODO
-            ...
+            x = self.inputs[0]
+            x = -x
+            self.inputs[0]._data = x._data
 
         gy = gys[0]
 
@@ -312,8 +313,10 @@ class Pow(Function):
         assert len(gys) == 1, "Pow must take one argument"
 
         if self.inplace:
-            # TODO
-            ...
+            x = self.inputs[0]
+            x = x ** (1 / self.c)
+
+            self.inputs[0]._data = x._data
 
         gy = gys[0]
         x = self.inputs[0]
@@ -370,6 +373,13 @@ def neg(x: INPUT_TYPE | Tensor) -> Tensor:
     assert len(result) == 1, "Neg must return a single Tensor"
 
     return result[0]
+
+
+def neg_(x: INPUT_TYPE | Tensor) -> None:
+    """https://pytorch.org/docs/stable/generated/torch.Tensor.neg_.html"""
+    x = as_tensor(x)
+
+    Neg()(x, inplace=True)
 
 
 def sub(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
@@ -444,6 +454,13 @@ def pow(x: INPUT_TYPE | Tensor, c: int | float) -> Tensor:
     return result[0]
 
 
+def pow_(x: INPUT_TYPE | Tensor, c: int | float) -> None:
+    """https://pytorch.org/docs/stable/generated/torch.Tensor.pow_.html"""
+    x = as_tensor(x)
+
+    Pow(c)(x, inplace=True)
+
+
 class Tensor:
     """An imitation of torch.Tensor in PyTorch
 
@@ -475,6 +492,8 @@ class Tensor:
     sub_ = sub_
     mul_ = mul_
     div_ = div_
+    neg_ = neg_
+    pow_ = pow_
 
     # NOTE: set the priority of tensor to be higher than numpy array.
     # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,
