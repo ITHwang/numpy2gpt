@@ -809,10 +809,11 @@ def test_tensor_inplace_method_add() -> None:
     # Case 1: requires_grad=True
     x0 = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
     x1 = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+    x2 = torch.tensor([10.0, 20.0, 30.0], requires_grad=True)
 
     # Perform inplace add
     y = x0.add(x1)
-    ret = y.add_([10.0, 20.0, 30.0])
+    ret = y.add_(x2)
 
     # --- Check operation ---
     assert ret is None, "Inplace add should return None"
@@ -825,12 +826,16 @@ def test_tensor_inplace_method_add() -> None:
 
     assert (x0_grad := x0.grad) is not None
     assert (x1_grad := x1.grad) is not None
+    assert (x2_grad := x2.grad) is not None
 
     assert np.allclose(x0_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
         "Gradient for x0 is incorrect"
     )
     assert np.allclose(x1_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
         "Gradient for x1 is incorrect"
+    )
+    assert np.allclose(x2_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
+        "Gradient for x2 is incorrect"
     )
 
     # Case 2: requires_grad=False
@@ -848,11 +853,11 @@ def test_tensor_inplace_method_sub() -> None:
     # Case 1: requires_grad=True
     x0 = torch.tensor([10.0, 20.0, 30.0], requires_grad=True)
     x1 = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
-    x2 = torch.tensor([5.0, 6.0, 7.0], requires_grad=False)
+    x2 = torch.tensor([5.0, 6.0, 7.0], requires_grad=True)
 
     # Perform inplace sub
     y = x0.add(x1)
-    ret = y.sub_(torch.tensor([5.0, 6.0, 7.0]))
+    ret = y.sub_(x2)
 
     # --- Check operation ---
     assert ret is None, "Inplace sub should return None"
@@ -865,12 +870,16 @@ def test_tensor_inplace_method_sub() -> None:
 
     assert (x0_grad := x0.grad) is not None
     assert (x1_grad := x1.grad) is not None
+    assert (x2_grad := x2.grad) is not None
 
     assert np.allclose(x0_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
         "Gradient for x0 is incorrect after sub_"
     )
     assert np.allclose(x1_grad.numpy(), np.array([1.0, 1.0, 1.0])), (
         "Gradient for x1 is incorrect after sub_"
+    )
+    assert np.allclose(x2_grad.numpy(), np.array([-1.0, -1.0, -1.0])), (
+        "Gradient for x2 is incorrect after sub_"
     )
 
     # Case 2: requires_grad=False
@@ -890,10 +899,11 @@ def test_tensor_inplace_method_mul() -> None:
     # Case 1: requires_grad=True
     x0 = torch.tensor([2.0, 3.0, 4.0], requires_grad=True)
     x1 = torch.tensor([5.0, 6.0, 7.0], requires_grad=True)
+    x2 = torch.tensor([10.0, 20.0, 30.0], requires_grad=True)
 
     # Perform inplace mul: x0 becomes x0_original * x1
     y = x0.add(x1)
-    ret = y.mul_([10.0, 20.0, 30.0])
+    ret = y.mul_(x2)
 
     # --- Check operation ---
     assert ret is None, "Inplace mul should return None"
@@ -906,12 +916,16 @@ def test_tensor_inplace_method_mul() -> None:
 
     assert (x0_grad := x0.grad) is not None
     assert (x1_grad := x1.grad) is not None
+    assert (x2_grad := x2.grad) is not None
 
     assert np.allclose(x0_grad.numpy(), np.array([10.0, 20.0, 30.0])), (
         "Gradient for x0 is incorrect after mul_"
     )
     assert np.allclose(x1_grad.numpy(), np.array([10.0, 20.0, 30.0])), (
         "Gradient for x1 is incorrect after mul_"
+    )
+    assert np.allclose(x2_grad.numpy(), np.array([7.0, 9.0, 11.0])), (
+        "Gradient for x2 is incorrect after mul_"
     )
 
     # Case 2: requires_grad=False

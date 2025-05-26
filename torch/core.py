@@ -60,7 +60,12 @@ class Function:
             isinstance(input, Tensor) for input in inputs
         )
 
-        if inplace and any(input.is_leaf and input.requires_grad for input in inputs):
+        if (
+            inplace
+            and len(inputs) > 0
+            and inputs[0].is_leaf
+            and inputs[0].requires_grad
+        ):
             raise RuntimeError(
                 "a leaf Variable that requires grad is being used in an in-place operation."
             )

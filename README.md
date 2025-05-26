@@ -50,6 +50,14 @@
     Tensor2 -. "creator" .-> Function
     ```
 
+  - **What if we do in-place operations?**
+    - PyTorch support in-place operations of tensors by attaching an underscore("_") to the method name.(It discourages users to do in-place operations though.. [link](https://pytorch.org/docs/stable/autograd.html#in-place-operations-on-tensors))
+    - To implement them, a tensor should be able to have multiple creators, because in-place operations make the tensor an input/output at the same time.
+    - When the tensor do $N$ in-place operations, the tensor will have $N + 1$ creators.
+    - Here an example:
+
+    - TBD: a diagram for in-place operations
+
   - `Generation`
     - Each node(tensor or function) has its generation that means the order of the node being created.
     - Being started from 0, the generation number is incremented when the node is created.
@@ -72,13 +80,6 @@
       c --> Func4[Func4 @ 2]
       Func4 --> y((y @ 3))
     ```
-  
-  - **What if we do in-place operations?**
-    - PyTorch support in-place operations of tensors by attaching an underscore("_") to the method name.(It discourages users to do in-place operations though.. [link](https://pytorch.org/docs/stable/autograd.html#in-place-operations-on-tensors))
-    - To implement them, a tensor should be able to have multiple creators, because in-place operations make the tensor an input/output at the same time.
-    - When the tensor do $N$ in-place operations, the tensor will have $N + 1$ creators.
-    - Here an example:
-    - TBD: a diagram for in-place operations
 4. Memory Optimization
   - As you can see the diagram at `Creator`, the function and the output refer to each other.(circular reference)
   - To avoid this, we use `weakref.ref` for the outputs of the function.
