@@ -940,8 +940,54 @@ def test_tensor_inplace_method_mul() -> None:
 
 def test_tensor_inplace_method_div() -> None:
     """Test `tensor1.div_(tensor2)`."""
-    # TODO
-    assert True
+    # Case 1: requires_grad=True
+    x0 = torch.tensor([10.0, 20.0, 30.0], requires_grad=True)
+    x1 = torch.tensor([2.0, 4.0, 5.0], requires_grad=True)
+    x2 = torch.tensor([7.0, 8.0, 9.0], requires_grad=True)
+
+    y = x0.mul(x1)
+    ret = y.div_(x2)
+
+    # --- Check operation ---
+    assert ret is None, "Inplace div should return None"
+    assert np.allclose(y.numpy(), np.array([20.0 / 7.0, 80.0 / 8.0, 150.0 / 9.0])), (
+        "Data not updated correctly for div_"
+    )
+
+    # --- Check backward ---
+    y.backward(torch.ones_like(y))  # Gradient of loss w.r.t. y
+
+    assert (x0_grad := x0.grad) is not None
+    assert (x1_grad := x1.grad) is not None
+    assert (x2_grad := x2.grad) is not None
+
+    assert np.allclose(x0_grad.numpy(), np.array([2.0 / 7.0, 4.0 / 8.0, 5.0 / 9.0])), (
+        "Gradient for x0 is incorrect after div_"
+    )
+    assert np.allclose(
+        x1_grad.numpy(), np.array([10.0 / 7.0, 20.0 / 8.0, 30.0 / 9.0])
+    ), "Gradient for x1 is incorrect after div_"
+
+    assert np.allclose(
+        x2_grad.numpy(),
+        np.array([-20.0 / 7.0**2, -80.0 / 8.0**2, -150.0 / 9.0**2]),
+    ), "Gradient for x2 is incorrect after div_"
+
+    # Case 2: requires_grad=False
+    x0_no_grad = torch.tensor([10.0, 20.0, 30.0], requires_grad=False)
+    x1_no_grad = torch.tensor([2.0, 4.0, 5.0], requires_grad=False)
+    x2_no_grad = torch.tensor([7.0, 8.0, 9.0], requires_grad=False)
+
+    ret_1 = x0_no_grad.div_(x1_no_grad)
+    ret_2 = x0_no_grad.div_(x2_no_grad)
+
+    assert ret_1 is None
+    assert ret_2 is None
+
+    assert np.allclose(
+        x0_no_grad.numpy(),
+        np.array([10.0 / 2.0 / 7.0, 20.0 / 4.0 / 8.0, 30.0 / 5.0 / 9.0]),
+    )
 
 
 def test_tensor_inplace_method_neg() -> None:

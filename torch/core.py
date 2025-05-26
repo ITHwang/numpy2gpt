@@ -281,8 +281,10 @@ class Div(Function):
         assert len(gys) == 1, "Div must take one argument"
 
         if self.inplace:
-            # TODO
-            ...
+            x0, x1 = self.inputs
+            x0 = x0 * x1
+
+            self.inputs[0]._data = x0._data
 
         gy = gys[0]
         x0, x1 = self.inputs
@@ -412,6 +414,13 @@ def div(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     return result[0]
 
 
+def div_(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> None:
+    """https://pytorch.org/docs/stable/generated/torch.Tensor.div_.html"""
+    x0, x1 = as_tensor(x0), as_tensor(x1)
+
+    Div()(x0, x1, inplace=True)
+
+
 def rdiv(x0: INPUT_TYPE | Tensor, x1: INPUT_TYPE | Tensor) -> Tensor:
     x0, x1 = as_tensor(x0), as_tensor(x1)
 
@@ -465,6 +474,7 @@ class Tensor:
     add_ = add_
     sub_ = sub_
     mul_ = mul_
+    div_ = div_
 
     # NOTE: set the priority of tensor to be higher than numpy array.
     # When calling special methods(`__add__`, `__mul__`, etc.) with a numpy array,
