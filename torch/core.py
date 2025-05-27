@@ -851,7 +851,7 @@ class Tensor:
             for creator in self._creators.items():
                 add_func(creator)
         else:
-            raise ValueError("The final output should have a grad_fn")
+            raise ValueError("The final output should have at least one creator.")
 
         while funcs:
             f = funcs.pop()

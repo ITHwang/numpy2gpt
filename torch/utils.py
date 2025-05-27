@@ -7,6 +7,7 @@ from typing import Literal
 from loguru import logger
 
 from torch import Function, Tensor
+from torch.priority_queue import PriorityQueue
 
 
 def set_logging_level(
@@ -49,8 +50,12 @@ def _dot_var(v: Tensor, verbose: bool = False) -> str:
 def _dot_func(f: Function) -> str:
     """Get a dot graph of a function.
 
+    Each input edge is a solid line with a hollow arrowhead.
+    Each output edge is a solid line with a filled arrowhead.
+
     Args:
         f: The function to get the dot graph of.
+        inplace: Whether the function is inplace.
 
     Returns:
         A dot graph of the function.
@@ -58,11 +63,14 @@ def _dot_func(f: Function) -> str:
 
     txt = f'{id(f)} [label="{f.__class__.__name__}", color=lightblue, style=filled, shape=box]\n'
     for x in f.inputs:
-        txt += f"{id(x)} -> {id(f)}\n"
+        txt += f"{id(x)} -> {id(f)} [arrowhead=onormal]\n"
 
-    for y in f.outputs:
-        # NOTE: y is a weakref.ref[Tensor]
-        txt += f"{id(f)} -> {id(y())}\n"
+    if f.inplace:
+        txt += f"{id(f)} -> {id(f.inputs[0])}\n"
+    else:
+        for y in f.outputs:
+            # NOTE: y is a weakref.ref[Tensor]
+            txt += f"{id(f)} -> {id(y())}\n"
 
     return txt
 
@@ -82,18 +90,29 @@ def get_dot_graph(output: Tensor, verbose: bool = False) -> str:
         A dot graph of the computation graph.
     """
     txt = ""
-    funcs: list[Function] = []
+
+    funcs: PriorityQueue[Function] = PriorityQueue()
     seen_set: set[Function] = set()
 
     def add_func(f: Function) -> None:
+        """Push a func to the priority queue.
+
+        If the func is already in the seen set, it will not be pushed,
+        which prevent the same func from doing backward propagation multiple times.
+
+        Args:
+            f (Function): the function to push
+        """
         if f not in seen_set:
-            funcs.append(f)
+            funcs.push(f, f.generation)
             seen_set.add(f)
 
-    if output.grad_fn is None:
-        raise ValueError("output tensor has no grad_fn")
+    if output.grad_fn:
+        for creator in output._creators.items():
+            add_func(creator)
+    else:
+        raise ValueError("The final output should have at least one creator.")
 
-    add_func(output.grad_fn)
     txt += _dot_var(output, verbose)
 
     while funcs:
@@ -104,7 +123,8 @@ def get_dot_graph(output: Tensor, verbose: bool = False) -> str:
             txt += _dot_var(x, verbose)
 
             if x.grad_fn is not None:
-                add_func(x.grad_fn)
+                for creator in x._creators.items():
+                    add_func(creator)
 
     return f"digraph g {{\n{txt}}}"
 
