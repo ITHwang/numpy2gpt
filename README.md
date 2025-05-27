@@ -56,7 +56,29 @@
     - When the tensor do $N$ in-place operations, the tensor will have $N + 1$ creators.
     - Here an example:
 
-    - TBD: a diagram for in-place operations
+    ```mermaid
+    graph LR
+        T1(("Tensor1")) --> add["add"]
+        T2(("Tensor2")) --> add
+        add --> y(("y"))
+        T3(("Tensor3")) --> mul_["mul_"]
+        y --> mul_
+        mul_ --> y
+
+        add -. input .-> T1
+        add -. input .-> T2
+        add -. output .-> y
+        y -. creator .-> add
+
+        mul_ -. input .-> y
+        mul_ -. input .-> T3
+        y -. creator .-> mul_
+    ```
+
+    - As you can see, y is involved in the in-place operation(`mul_`) and has two creators(`add` and `mul_`).
+    - Unlike `add`, `mul_` doesn't have the output tensor, but the output value is stored in the input tensor `y`, which helps save the memory of the output tensor.
+    - However, when backpropagating, we need to revert the value of the input tensor to the original input value before calculating the gradient of the input tensor, which needs more computation.
+    - For more details, See in-place operations(`add_`, `sub_`, `mul_`, `div_`, `pow_`, `neg_`) in `torch/core.py`.
 
   - `Generation`
     - Each node(tensor or function) has its generation that means the order of the node being created.
@@ -145,10 +167,10 @@ This library implements a subset of PyTorch's tensor operations from scratch usi
 
 ### 1.1. Supported Operations
 
-- **Creation**: `torch.tensor()` - Create tensors from Python scalars, lists, or NumPy arrays
-- **Arithmetic**: Addition, Subtraction, Multiplication, Division, Negation, Power
+- **Creation**: `torch.tensor()`
+- **Arithmetic**: `add()`, `sub()`, `mul()`, `div()`, `neg()`, `pow()`
+- **In-place Operations**: `add_()`, `sub_()`, `mul_()`, `div_()`, `neg_()`, `pow_()`
 - **Mathematical**: `square()`, `exp()`, `cos()`, `sin()`, `tanh()`
-- **In-place Operations**: TBD
 - See: [torch](https://pytorch.org/docs/stable/torch.html), [torch.Tensor](https://pytorch.org/docs/stable/tensors.html).
 
 ### 1.2. Autograd
