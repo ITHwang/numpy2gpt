@@ -72,13 +72,7 @@ class Function:
 
         # forward propagation
         xs = tuple(input._data for input in inputs)
-
-        # NOTE: temporary if-branch for only add inplace operation.
-        # After all inplace operations are implemented, remove the if-branch.
-        if inplace:
-            ys = self.forward(*xs, inplace=inplace)
-        else:
-            ys = self.forward(*xs)
+        ys = self.forward(*xs, inplace=inplace)
 
         if not isinstance(ys, tuple):
             ys = (ys,)
@@ -133,6 +127,11 @@ class Function:
 
     @overload
     def forward(self, *xs: np.ndarray, inplace: Literal[True]) -> np.ndarray: ...
+
+    @overload
+    def forward(
+        self, *xs: np.ndarray, inplace: bool
+    ) -> np.ndarray | tuple[np.ndarray, ...]: ...
 
     def forward(
         self, *xs: np.ndarray, inplace: bool = False
@@ -523,6 +522,8 @@ class Tensor:
                 data = np.array(data)
         else:
             raise ValueError(f"Data has an invalid type: {type(data)}")
+
+        assert isinstance(data, np.ndarray)
 
         if dtype is not None:
             # Convert data type using astype.
